@@ -424,11 +424,7 @@ export async function fetchWorkflows(keyword = '') {
     const pageResult = await api.getWorkflows(1, 50, keyword);
     const items = pageResult?.items || (Array.isArray(pageResult) ? pageResult : []);
     state.workflows = items.map(mapWorkflowDtoToWorkflow);
-    if (state.workflows.length > 0) {
-      if (!state.workflows.some(w => w.id === state.selectedWorkflowId)) {
-        state.selectedWorkflowId = state.workflows[0].id;
-      }
-    } else {
+    if (state.selectedWorkflowId && !state.workflows.some(w => w.id === state.selectedWorkflowId)) {
       state.selectedWorkflowId = '';
     }
   } catch (err: any) {
@@ -685,7 +681,7 @@ export async function deleteWorkflow(id: string) {
   } finally {
     state.workflows = state.workflows.filter((w) => w.id !== id);
     if (state.selectedWorkflowId === id) {
-      state.selectedWorkflowId = state.workflows[0]?.id || '';
+      state.selectedWorkflowId = '';
     }
   }
 }
