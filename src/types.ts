@@ -199,3 +199,23 @@ export interface ToastMessage {
   title?: string;
   message: string;
 }
+
+export interface WebSocketEvent {
+  eventSeq: number;
+  eventType:
+    | 'RUN_STARTED'
+    | 'RUN_FINISHED'
+    | 'NODE_STARTED'
+    | 'NODE_FINISHED'
+    | 'NODE_FAILED'
+    | 'NODE_RETRYING'
+    | 'OUTPUT_CHUNK'
+    | 'TOOL_CALLED'
+    | 'LOG'
+    | 'HEARTBEAT_ACK'
+    | 'REPLAY_RESULT';
+  runId: number | string;
+  nodeKey: string | null;
+  timestamp: string;
+  payload: Record<string, any>;
+}
