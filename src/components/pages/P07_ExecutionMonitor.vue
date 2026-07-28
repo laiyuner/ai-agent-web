@@ -38,7 +38,7 @@
 
           <!-- Status Indicator Pill -->
           <span
-            class="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider"
+            class="text-xs px-3 py-1 rounded-full font-bold"
             :class="statusClass(currentRun.status)"
           >
             {{ statusText(currentRun.status) }}
@@ -50,7 +50,8 @@
             :class="{
               'bg-emerald-50 text-emerald-700 border border-emerald-200': wsStatus === '已连接',
               'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse': wsStatus === '连接中...' || wsStatus === '重连中...',
-              'bg-slate-100 text-slate-500 border border-slate-200': wsStatus === '已断开' || wsStatus === '已完成'
+              'bg-slate-100 text-slate-500 border border-slate-200': wsStatus === '已结束' || wsStatus === '已断开' || wsStatus === '已完成',
+              'bg-rose-50 text-rose-700 border border-rose-200': wsStatus === '加载失败'
             }"
           >
             <Wifi v-if="wsStatus === '已连接'" class="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
@@ -65,8 +66,9 @@
       </div>
 
       <div class="flex items-center gap-2.5 pl-9 sm:pl-0">
+        <!-- 只有 RUNNING 状态才显示"中断运行"按钮 -->
         <button
-          v-if="currentRun.status === 'RUNNING' || currentRun.status === 'running'"
+          v-if="(currentRun.status || '').toUpperCase() === 'RUNNING'"
           @click="handleStopRun"
           class="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-bold border border-rose-200 transition-colors flex items-center gap-2 cursor-pointer"
         >
@@ -74,12 +76,14 @@
           <span>中断运行</span>
         </button>
 
+        <!-- 非 RUNNING 状态显示"返回列表"按钮 -->
         <button
-          @click="setRoute('workflows')"
-          class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
+          v-if="(currentRun.status || '').toUpperCase() !== 'RUNNING'"
+          @click="setRoute('runs')"
+          class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
         >
-          <RotateCcw class="w-4 h-4" />
-          <span>返回工作流列表</span>
+          <ArrowLeft class="w-4 h-4" />
+          <span>返回列表</span>
         </button>
       </div>
     </div>
@@ -192,28 +196,102 @@
           v-if="selectedNodeKey"
           class="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4"
         >
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
             <div class="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
               <FileCode class="w-4 h-4 text-indigo-600" />
               <span>节点输入/输出 ({{ selectedNodeKey }})</span>
             </div>
-            <span class="text-xs font-mono text-slate-400">Status: {{ getNodeStatus(selectedNodeKey) }}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono text-slate-400">Status: {{ getNodeStatus(selectedNodeKey) }}</span>
+              <span class="text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-medium">
+                支持内部滚动，点击放大可全屏查看
+              </span>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-            <div class="space-y-2">
-              <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider">输入</span>
-              <pre class="p-4 bg-slate-950 text-slate-200 rounded-2xl overflow-x-auto text-xs leading-relaxed max-h-64 select-text">{{ currentSelectedNodeInput }}</pre>
-            </div>
-
+            <!-- Input Card -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider">输出</span>
-                <span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="text-[11px] text-indigo-500 font-sans font-semibold animate-pulse">
-                  打字机生成中...
+                <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>输入</span>
+                  <span class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeInput) }} chars)</span>
                 </span>
+
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click="copyText(currentSelectedNodeInput, 'input')"
+                    class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                    :title="copiedState === 'input' ? '已复制' : '复制输入 JSON'"
+                  >
+                    <Check v-if="copiedState === 'input'" class="w-3.5 h-3.5 text-emerald-600" />
+                    <Copy v-else class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    @click="openModal('输入 JSON (' + selectedNodeKey + ')', currentSelectedNodeInput)"
+                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                    title="弹窗全屏查看全部"
+                  >
+                    <Maximize2 class="w-3.5 h-3.5" />
+                    <span>全屏</span>
+                  </button>
+                </div>
               </div>
-              <pre class="p-4 bg-slate-950 text-emerald-300 rounded-2xl overflow-x-auto text-xs leading-relaxed max-h-64 whitespace-pre-wrap select-text">{{ currentSelectedNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
+
+              <!-- Input Code Container (Fixed Flat Height with Internal Scrollbar) -->
+              <div
+                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden h-30 flex flex-col"
+              >
+                <div class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text">
+                  <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeInput }}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Card -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>输出</span>
+                  <span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="text-[11px] text-indigo-500 font-sans font-semibold animate-pulse">
+                    打字机生成中...
+                  </span>
+                  <span v-else class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeOutput) }} chars)</span>
+                </span>
+
+                <div class="flex items-center gap-1.5">
+                  <button
+                    @click="copyText(currentSelectedNodeOutput, 'output')"
+                    class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                    :title="copiedState === 'output' ? '已复制' : '复制输出数据'"
+                  >
+                    <Check v-if="copiedState === 'output'" class="w-3.5 h-3.5 text-emerald-600" />
+                    <Copy v-else class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    @click="openModal('输出结果 (' + selectedNodeKey + ')', currentSelectedNodeOutput)"
+                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                    title="弹窗全屏查看全部"
+                  >
+                    <Maximize2 class="w-3.5 h-3.5" />
+                    <span>全屏</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Output Code Container (Fixed Flat Height with Internal Scrollbar) -->
+              <div
+                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden h-30 flex flex-col"
+              >
+                <div
+                  ref="outputContainer"
+                  class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
+                >
+                  <pre class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -224,9 +302,40 @@
             <div class="flex items-center gap-2.5 text-slate-200 font-bold text-sm">
               <Terminal class="w-4 h-4 text-emerald-400" />
               <span>执行日志</span>
+              <span class="text-[11px] font-normal px-2 py-0.5 bg-slate-900 text-slate-400 rounded-full border border-slate-800">
+                共 {{ logs.length }} 条
+              </span>
             </div>
 
-            <div class="flex items-center gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap text-xs">
+              <!-- Log Filter Search Input -->
+              <div class="relative flex items-center">
+                <Search class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
+                <input
+                  v-model="logQuery"
+                  type="text"
+                  placeholder="过滤日志..."
+                  class="pl-8 pr-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 text-xs focus:outline-hidden focus:border-indigo-500 w-28 sm:w-36 transition-all"
+                />
+              </div>
+
+              <!-- Level Filter Filter Pills -->
+              <div class="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                <button
+                  v-for="lvl in ['ALL', 'INFO', 'WARN', 'ERROR']"
+                  :key="lvl"
+                  @click="logLevelFilter = lvl"
+                  class="px-2 py-0.5 text-[10px] font-sans font-bold rounded transition-colors cursor-pointer"
+                  :class="
+                    logLevelFilter === lvl
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  "
+                >
+                  {{ lvl }}
+                </button>
+              </div>
+
               <!-- Live WS connection label -->
               <span
                 class="text-xs font-sans px-2.5 py-0.5 rounded-full font-semibold"
@@ -250,6 +359,15 @@
               </button>
 
               <button
+                @click="copyAllLogs"
+                class="text-slate-400 hover:text-indigo-400 transition-colors p-1 rounded-md cursor-pointer"
+                :title="copiedState === 'logs' ? '已复制日志' : '复制全部日志'"
+              >
+                <Check v-if="copiedState === 'logs'" class="w-3.5 h-3.5 text-emerald-400" />
+                <Copy v-else class="w-3.5 h-3.5" />
+              </button>
+
+              <button
                 @click="clearLogs"
                 class="text-slate-400 hover:text-rose-400 transition-colors p-1 rounded-md cursor-pointer"
                 title="清空执行日志"
@@ -259,19 +377,19 @@
             </div>
           </div>
 
-          <!-- Log stream list container -->
+          <!-- Log stream list container with internal scrolling -->
           <div
             ref="logContainer"
-            class="h-80 overflow-y-auto space-y-2 pr-2 text-slate-300 scrollbar-thin scroll-smooth"
+            class="h-80 overflow-y-auto space-y-2 pr-2 text-slate-300 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 scroll-smooth"
           >
             <div
-              v-for="(log, idx) in logs"
+              v-for="(log, idx) in filteredLogs"
               :key="idx"
-              class="flex items-start gap-2.5 leading-relaxed"
+              class="flex items-start gap-2.5 leading-relaxed hover:bg-slate-900/60 p-1 rounded-md transition-colors"
             >
-              <span class="text-slate-500 shrink-0">[{{ log.time }}]</span>
+              <span class="text-slate-500 shrink-0 select-none">[{{ log.time }}]</span>
               <span
-                class="uppercase text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0"
+                class="uppercase text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 select-none"
                 :class="
                   log.level === 'error'
                     ? 'bg-rose-950 text-rose-400 border border-rose-800'
@@ -282,17 +400,66 @@
               >
                 {{ log.level }}
               </span>
-              <span :class="log.level === 'error' ? 'text-rose-300' : 'text-slate-200'" class="text-xs break-all">
+              <span :class="log.level === 'error' ? 'text-rose-300' : 'text-slate-200'" class="text-xs break-all select-text">
                 {{ log.message }}
               </span>
             </div>
 
-            <div v-if="logs.length === 0" class="py-12 text-center text-slate-600 italic">
-              等待推流事件下发中...
+            <div v-if="filteredLogs.length === 0" class="py-12 text-center text-slate-600 italic">
+              {{ logs.length > 0 ? '无匹配该过滤条件的日志记录' : '等待推流事件下发中...' }}
             </div>
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Fullscreen JSON / Output Inspector Modal -->
+    <div
+      v-if="isModalOpen"
+      class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+    >
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2.5 text-slate-100 font-bold text-sm">
+            <FileCode class="w-4 h-4 text-indigo-400" />
+            <span>{{ modalTitle }}</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="copyText(modalContent, 'modal')"
+              class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check v-if="copiedState === 'modal'" class="w-3.5 h-3.5 text-emerald-400" />
+              <Copy v-else class="w-3.5 h-3.5" />
+              <span>{{ copiedState === 'modal' ? '已复制' : '复制内容' }}</span>
+            </button>
+
+            <button
+              @click="closeModal"
+              class="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+            >
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Modal Content Body -->
+        <div class="p-6 overflow-y-auto flex-1 font-mono text-xs text-emerald-300 leading-relaxed bg-slate-950">
+          <pre class="whitespace-pre-wrap select-text">{{ modalContent }}</pre>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 border-t border-slate-800 bg-slate-900 flex justify-end">
+          <button
+            @click="closeModal"
+            class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+          >
+            关闭窗口
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -313,12 +480,34 @@ import {
   Cpu,
   Sparkles,
   Trash2,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Copy,
+  Check,
+  Search,
+  X,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import { api, tokenManager, mapRunDtoToRunRecord } from '../../api';
 import { WebSocketEvent } from '../../types';
 
 const { state, setRoute, stopRun } = useAppStore();
+
+// UI States for Expansion & Modal
+const isInputExpanded = ref(false);
+const isOutputExpanded = ref(false);
+const copiedState = ref<string | null>(null);
+
+const logContainer = ref<HTMLDivElement | null>(null);
+const outputContainer = ref<HTMLDivElement | null>(null);
+
+const logQuery = ref('');
+const logLevelFilter = ref('ALL');
+
+const isModalOpen = ref(false);
+const modalTitle = ref('');
+const modalContent = ref('');
 
 // Current Run record from Backend API or Store
 const currentRun = ref<any>(null);
@@ -340,7 +529,6 @@ const nodeDurations = reactive<Record<string, number>>({}); // nodeKey -> durati
 
 // Logs list
 const logs = reactive<Array<{ time: string; level: string; message: string }>>([]);
-const logContainer = ref<HTMLDivElement | null>(null);
 const autoScroll = ref(true);
 
 // Selected node key
@@ -416,34 +604,96 @@ const currentSelectedNodeOutput = computed(() => {
   return found?.outputJson || currentRun.value?.output || '等待输出...';
 });
 
+// Auto-scroll output container on new streamed content
+watch(currentSelectedNodeOutput, () => {
+  nextTick(() => {
+    if (outputContainer.value) {
+      outputContainer.value.scrollTop = outputContainer.value.scrollHeight;
+    }
+  });
+});
+
+// Computed filtered log stream for search/level filtering
+const filteredLogs = computed(() => {
+  return logs.filter((log) => {
+    // Level filter
+    if (logLevelFilter.value !== 'ALL') {
+      if (log.level.toLowerCase() !== logLevelFilter.value.toLowerCase()) {
+        return false;
+      }
+    }
+    // Query filter
+    if (logQuery.value.trim()) {
+      const q = logQuery.value.trim().toLowerCase();
+      const matchMsg = log.message ? log.message.toLowerCase().includes(q) : false;
+      const matchLevel = log.level ? log.level.toLowerCase().includes(q) : false;
+      const matchTime = log.time ? log.time.includes(q) : false;
+      return matchMsg || matchLevel || matchTime;
+    }
+    return true;
+  });
+});
+
+function getInputLength(val?: string): number {
+  if (!val) return 0;
+  return val.length;
+}
+
+function copyText(val: string, key: string) {
+  if (!val) return;
+  navigator.clipboard.writeText(val);
+  copiedState.value = key;
+  setTimeout(() => {
+    if (copiedState.value === key) {
+      copiedState.value = null;
+    }
+  }, 2000);
+}
+
+function copyAllLogs() {
+  if (logs.length === 0) return;
+  const text = logs.map((l) => `[${l.time}] [${l.level.toUpperCase()}] ${l.message}`).join('\n');
+  copyText(text, 'logs');
+}
+
+function openModal(title: string, content: string) {
+  modalTitle.value = title;
+  modalContent.value = content || '{}';
+  isModalOpen.value = true;
+}
+
+function closeModal() {
+  isModalOpen.value = false;
+}
+
 // Helper for status text
-function statusText(status: string): string {
-  if (!status) return '待执行';
+function statusText(status: string | undefined): string {
+  if (!status) return '等待中';
   const upper = status.toUpperCase();
   const map: Record<string, string> = {
-    PENDING: '待执行',
+    PENDING: '等待中',
     RUNNING: '运行中',
     SUCCESS: '成功',
     FAILED: '失败',
-    TERMINATED: '已中断',
+    TERMINATED: '已终止',
     CANCELED: '已取消',
   };
   return map[upper] || status;
 }
 
 // Helper for status styling class
-function statusClass(status: string): string {
-  if (!status) return 'bg-slate-100 text-slate-500';
+function statusClass(status: string | undefined): string {
+  if (!status) return 'bg-slate-50 text-slate-700 border border-slate-200';
   const upper = status.toUpperCase();
   const map: Record<string, string> = {
-    PENDING: 'bg-slate-100 text-slate-500 border border-slate-200',
-    RUNNING: 'bg-amber-100 text-amber-800 animate-pulse border border-amber-300',
-    SUCCESS: 'bg-emerald-100 text-emerald-800 border border-emerald-300',
-    FAILED: 'bg-rose-100 text-rose-800 border border-rose-300',
-    TERMINATED: 'bg-slate-200 text-slate-700 border border-slate-300',
-    CANCELED: 'bg-slate-200 text-slate-700 border border-slate-300',
+    PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
+    RUNNING: 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse',
+    SUCCESS: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    FAILED: 'bg-rose-50 text-rose-700 border border-rose-200',
+    TERMINATED: 'bg-slate-50 text-slate-700 border border-slate-200',
+    CANCELED: 'bg-slate-50 text-slate-700 border border-slate-200',
   };
-  return map[upper] || 'bg-slate-100 text-slate-500';
+  return map[upper] || 'bg-slate-50 text-slate-700 border border-slate-200';
 }
 
 function getNodeStatus(nodeKey: string): string {
@@ -464,6 +714,11 @@ function addLog(level: string, message: string, timestamp?: string) {
     } else {
       timeStr = timestamp.slice(-8);
     }
+  }
+
+  // Memory safeguard: Cap maximum logs in UI state at 1000 items
+  if (logs.length >= 1000) {
+    logs.shift();
   }
 
   logs.push({
@@ -697,6 +952,106 @@ function disconnect() {
   }
 }
 
+function loadHistoryData() {
+  if (!currentRun.value) return;
+
+  const nodeRuns = currentRun.value.nodeRuns || currentRun.value.nodeStates || [];
+  for (const nodeRun of nodeRuns) {
+    const key = nodeRun.nodeKey || nodeRun.nodeId || 'node-1';
+
+    // 节点状态
+    nodeStatuses[key] = (nodeRun.status || 'PENDING').toUpperCase();
+
+    // 节点输出
+    if (nodeRun.output) {
+      nodeOutputs[key] = typeof nodeRun.output === 'object'
+        ? JSON.stringify(nodeRun.output, null, 2)
+        : String(nodeRun.output);
+    } else if (nodeRun.outputJson) {
+      nodeOutputs[key] = typeof nodeRun.outputJson === 'object'
+        ? JSON.stringify(nodeRun.outputJson, null, 2)
+        : String(nodeRun.outputJson);
+    }
+
+    // 节点输入
+    if (nodeRun.input) {
+      nodeInputs[key] = typeof nodeRun.input === 'object'
+        ? JSON.stringify(nodeRun.input, null, 2)
+        : String(nodeRun.input);
+    } else if (nodeRun.inputJson) {
+      nodeInputs[key] = typeof nodeRun.inputJson === 'object'
+        ? JSON.stringify(nodeRun.inputJson, null, 2)
+        : String(nodeRun.inputJson);
+    }
+
+    // Token 用量
+    if (nodeRun.tokensUsed) {
+      nodeTokens[key] = typeof nodeRun.tokensUsed === 'object'
+        ? (nodeRun.tokensUsed.totalTokens || 0)
+        : Number(nodeRun.tokensUsed);
+    } else if (nodeRun.tokens) {
+      nodeTokens[key] = nodeRun.tokens;
+    }
+
+    // 耗时
+    if (nodeRun.durationMs) {
+      nodeDurations[key] = nodeRun.durationMs;
+    } else if (nodeRun.startedAt && nodeRun.finishedAt) {
+      const start = new Date(nodeRun.startedAt).getTime();
+      const end = new Date(nodeRun.finishedAt).getTime();
+      nodeDurations[key] = Math.max(0, end - start);
+    }
+
+    // 日志：工具调用记录
+    if (Array.isArray(nodeRun.toolCalls)) {
+      for (const tc of nodeRun.toolCalls) {
+        addLog(
+          'info',
+          `工具调用: ${tc.toolName || tc.name || 'tool'}(${typeof tc.args === 'object' ? JSON.stringify(tc.args) : (tc.args || '')})`,
+          nodeRun.startedAt
+        );
+      }
+    }
+
+    // 日志：节点完成/失败
+    if (nodeStatuses[key] === 'SUCCESS') {
+      addLog(
+        'info',
+        `节点 ${key} 完成，Token: ${nodeTokens[key] || 0}`,
+        nodeRun.finishedAt || nodeRun.startedAt
+      );
+    } else if (nodeStatuses[key] === 'FAILED') {
+      addLog(
+        'error',
+        `节点 ${key} 失败: ${nodeRun.errorMsg || nodeRun.error || '执行报错'}`,
+        nodeRun.finishedAt || nodeRun.startedAt
+      );
+    }
+  }
+
+  // 工作流级日志
+  const st = (currentRun.value.status || '').toUpperCase();
+  if (st === 'SUCCESS') {
+    addLog(
+      'info',
+      `工作流执行完成，总耗时: ${currentRun.value.durationMs || 0}ms`,
+      currentRun.value.finishedAt
+    );
+  } else if (st === 'FAILED') {
+    addLog(
+      'error',
+      `工作流执行失败: ${currentRun.value.errorMsg || '未知错误'}`,
+      currentRun.value.finishedAt
+    );
+  } else if (st === 'TERMINATED') {
+    addLog(
+      'warn',
+      `工作流已被终止`,
+      currentRun.value.finishedAt
+    );
+  }
+}
+
 // Initialization Lifecycle
 onMounted(async () => {
   const runId = state.selectedRunId || (state.runs[0] ? state.runs[0].id : null);
@@ -706,7 +1061,11 @@ onMounted(async () => {
   try {
     const rawData = await api.getRun(runId);
     if (rawData) {
-      currentRun.value = mapRunDtoToRunRecord ? mapRunDtoToRunRecord(rawData) : rawData;
+      const mapped = mapRunDtoToRunRecord ? mapRunDtoToRunRecord(rawData) : rawData;
+      if (rawData.nodeRuns) {
+        mapped.nodeRuns = rawData.nodeRuns;
+      }
+      currentRun.value = mapped;
     }
   } catch (err) {
     console.warn('后端获取执行单据失败，读取本地状态', err);
@@ -716,20 +1075,29 @@ onMounted(async () => {
     }
   }
 
-  // Initialize node states map
-  if (currentRun.value) {
-    for (const node of nodeList.value) {
-      nodeStatuses[node.nodeKey] = (node.status || 'PENDING').toUpperCase();
-    }
-    if (nodeList.value.length > 0) {
-      selectedNodeKey.value = nodeList.value[0].nodeKey;
-    }
+  if (!currentRun.value) {
+    wsStatus.value = '加载失败';
+    return;
   }
 
-  // 2. Establish WebSocket connection
-  const token = tokenManager.getAccessToken() || 'mock-jwt-token';
-  if (token && runId) {
-    connectWebSocket(runId, token);
+  // Initialize node states map & select first node
+  if (nodeList.value.length > 0) {
+    selectedNodeKey.value = nodeList.value[0].nodeKey;
+  }
+
+  // 2. Decide behavior according to run status
+  const currentStatus = (currentRun.value.status || '').toUpperCase();
+  if (currentStatus === 'RUNNING') {
+    // 运行中：建立 WebSocket 实时连接
+    wsStatus.value = '连接中...';
+    const token = tokenManager.getAccessToken() || 'mock-jwt-token';
+    if (token && runId) {
+      connectWebSocket(runId, token);
+    }
+  } else {
+    // 已结束 (SUCCESS / FAILED / TERMINATED / PENDING etc.)：不建立 WebSocket
+    wsStatus.value = '已结束';
+    loadHistoryData();
   }
 });
 

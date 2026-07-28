@@ -70,26 +70,41 @@
                 <span
                   class="px-3 py-1 rounded-full font-bold text-xs"
                   :class="
-                    run.status === 'running'
+                    (run.status || '').toUpperCase() === 'RUNNING'
                       ? 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
-                      : run.status === 'success'
+                      : (run.status || '').toUpperCase() === 'SUCCESS'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : (run.status || '').toUpperCase() === 'TERMINATED'
+                      ? 'bg-slate-100 text-slate-700 border border-slate-200'
                       : 'bg-rose-50 text-rose-700 border border-rose-200'
                   "
                 >
-                  {{ run.status === 'running' ? '运行推流中' : run.status === 'success' ? '执行成功' : '异常终止' }}
+                  {{
+                    (run.status || '').toUpperCase() === 'RUNNING'
+                      ? '运行中'
+                      : (run.status || '').toUpperCase() === 'SUCCESS'
+                      ? '成功'
+                      : (run.status || '').toUpperCase() === 'TERMINATED'
+                      ? '已终止'
+                      : '失败'
+                  }}
                 </span>
               </td>
-              <td class="py-4 px-5 uppercase text-xs text-slate-600 font-mono font-semibold">{{ run.triggerType }}</td>
+              <td class="py-4 px-5 uppercase text-xs text-slate-600 font-mono font-semibold">{{ run.triggerType || 'MANUAL' }}</td>
               <td class="py-4 px-5 text-slate-600 font-mono text-xs">{{ run.startTime }}</td>
               <td class="py-4 px-5 text-slate-800 font-mono font-bold">{{ run.durationMs }} ms</td>
               <td class="py-4 px-5 text-indigo-600 font-extrabold font-mono text-sm">{{ run.tokensUsed }}</td>
               <td class="py-4 px-5 text-right">
                 <button
                   @click="viewRun(run.id)"
-                  class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs sm:text-sm transition-colors"
+                  class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                  :class="
+                    (run.status || '').toUpperCase() === 'RUNNING'
+                      ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 animate-pulse'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  "
                 >
-                  查看日志推流
+                  {{ (run.status || '').toUpperCase() === 'RUNNING' ? '查看监控' : '查看详情' }}
                 </button>
               </td>
             </tr>
@@ -122,7 +137,9 @@ const filteredRuns = computed(() => {
     const matchesSearch =
       r.workflowName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       r.id.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesStatus = statusFilter.value === 'all' || r.status === statusFilter.value;
+    const matchesStatus =
+      statusFilter.value === 'all' ||
+      (r.status || '').toLowerCase() === statusFilter.value.toLowerCase();
     return matchesSearch && matchesStatus;
   });
 });
