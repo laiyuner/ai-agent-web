@@ -110,7 +110,7 @@
 
       <!-- Quick Route Actions -->
       <button
-        @click="setRoute('workflow-edit')"
+        @click="openNewWorkflowCanvas"
         class="hidden sm:flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
       >
         <Plus class="w-4 h-4" />
@@ -229,6 +229,11 @@ const displayModeLabel = computed(() => {
 function selectDisplayMode(mode: DisplayMode) {
   setDisplayMode(mode);
   showScaleDropdown.value = false;
+}
+
+function openNewWorkflowCanvas() {
+  state.selectedWorkflowId = '';
+  setRoute('workflow-edit');
 }
 
 function goToProfile() {

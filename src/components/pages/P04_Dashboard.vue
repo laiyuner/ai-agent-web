@@ -17,8 +17,8 @@
 
       <div class="mt-5 flex flex-wrap gap-3 z-10 relative">
         <button
-          @click="setRoute('workflow-edit')"
-          class="bg-white text-slate-900 hover:bg-slate-100 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2"
+          @click="openNewWorkflowCanvas"
+          class="bg-white text-slate-900 hover:bg-slate-100 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
         >
           <Plus class="w-4 h-4" />
           <span>新建可视化 DAG 工作流</span>
@@ -114,7 +114,7 @@
                 画布编辑
               </button>
               <button
-                @click="triggerRun(wf.id)"
+                @click="openRunDialog(wf)"
                 class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5"
               >
                 <Play class="w-4 h-4 fill-current" />
@@ -225,11 +225,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Execution Input Modal -->
+    <RunInputDialog
+      :is-open="runDialogOpen"
+      :workflow="selectedWfForRun"
+      @close="runDialogOpen = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
   Activity,
   Plus,
@@ -243,9 +250,18 @@ import {
   CheckCircle2,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { PageRoute } from '../../types';
+import RunInputDialog from '../common/RunInputDialog.vue';
+import { PageRoute, Workflow } from '../../types';
 
-const { state, setRoute, triggerRun } = useAppStore();
+const { state, setRoute } = useAppStore();
+
+const runDialogOpen = ref(false);
+const selectedWfForRun = ref<Workflow | null>(null);
+
+function openRunDialog(wf: Workflow) {
+  selectedWfForRun.value = wf;
+  runDialogOpen.value = true;
+}
 
 const statCards = computed(() => [
   {
@@ -293,6 +309,11 @@ const statCards = computed(() => [
     route: 'mcp-servers' as PageRoute,
   },
 ]);
+
+function openNewWorkflowCanvas() {
+  state.selectedWorkflowId = '';
+  setRoute('workflow-edit');
+}
 
 function openEdit(id: string) {
   state.selectedWorkflowId = id;

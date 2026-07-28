@@ -564,23 +564,64 @@ async function initAuthSession() {
 
 initAuthSession();
 
+// Helper functions for node/edge payload conversion
+function convertNodeToReq(n: any) {
+  let nodeType = 'AGENT';
+  if (n.type === 'startNode') nodeType = 'START';
+  else if (n.type === 'endNode') nodeType = 'END';
+  else if (n.type === 'toolNode') nodeType = 'TOOL';
+  else if (n.type === 'conditionNode') nodeType = 'CONDITION';
+
+  const agentId = (nodeType === 'AGENT' && n.data?.agentId)
+    ? (Number(n.data.agentId) || n.data.agentId)
+    : null;
+
+  return {
+    nodeKey: n.id,
+    nodeType,
+    name: n.data?.label || n.id,
+    agentId,
+    positionX: Math.round(n.position?.x || 0),
+    positionY: Math.round(n.position?.y || 0),
+    config: n.data?.config || {},
+  };
+}
+
+function convertEdgeToReq(e: any) {
+  return {
+    sourceNodeKey: e.source,
+    targetNodeKey: e.target,
+    condition: e.condition || null,
+  };
+}
+
+export async function fetchWorkflowDetail(id: string): Promise<Workflow | null> {
+  try {
+    const dto = await api.getWorkflow(id);
+    if (dto) {
+      const wf = mapWorkflowDtoToWorkflow(dto);
+      const idx = state.workflows.findIndex((w) => w.id === String(id));
+      if (idx !== -1) {
+        state.workflows[idx] = wf;
+      }
+      return wf;
+    }
+  } catch (err: any) {
+    console.warn('获取工作流详情失败:', err.message);
+  }
+  return null;
+}
+
 // Workflow Operations
 export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'author'>) {
   try {
     const reqData = {
       name: wf.name,
-      description: wf.description,
+      description: wf.description || '',
+      status: wf.status === 'published' ? 'PUBLISHED' : 'DRAFT',
       isPublic: !!wf.isPublic,
-      nodes: (wf.nodes || []).map((n) => ({
-        nodeKey: n.id,
-        agentId: n.data?.agentId ? Number(n.data.agentId) : undefined,
-        positionX: n.position?.x || 0,
-        positionY: n.position?.y || 0,
-      })),
-      edges: (wf.edges || []).map((e) => ({
-        sourceNodeKey: e.source,
-        targetNodeKey: e.target,
-      })),
+      nodes: (wf.nodes || []).map(convertNodeToReq),
+      edges: (wf.edges || []).map(convertEdgeToReq),
     };
     const dto = await api.createWorkflow(reqData);
     const newWf = mapWorkflowDtoToWorkflow(dto);
@@ -601,24 +642,17 @@ export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'autho
   }
 }
 
-export async function updateWorkflow(id: string, updates: Partial<Workflow>) {
+export async function updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | null> {
   try {
     const wf = state.workflows.find((w) => w.id === id);
-    const merged = { ...wf, ...updates };
+    const merged = { ...wf, ...updates } as Workflow;
     const reqData = {
       name: merged.name,
-      description: merged.description,
-      isPublic: merged.isPublic,
-      nodes: (merged.nodes || []).map((n: any) => ({
-        nodeKey: n.id,
-        agentId: n.data?.agentId ? Number(n.data.agentId) : undefined,
-        positionX: n.position?.x || 0,
-        positionY: n.position?.y || 0,
-      })),
-      edges: (merged.edges || []).map((e: any) => ({
-        sourceNodeKey: e.source,
-        targetNodeKey: e.target,
-      })),
+      description: merged.description || '',
+      status: merged.status === 'published' ? 'PUBLISHED' : 'DRAFT',
+      isPublic: !!merged.isPublic,
+      nodes: (merged.nodes || []).map(convertNodeToReq),
+      edges: (merged.edges || []).map(convertEdgeToReq),
     };
     const updatedDto = await api.updateWorkflow(id, reqData);
     const updatedWf = mapWorkflowDtoToWorkflow(updatedDto);
@@ -626,7 +660,8 @@ export async function updateWorkflow(id: string, updates: Partial<Workflow>) {
     if (idx !== -1) {
       state.workflows[idx] = updatedWf;
     }
-    addToast({ type: 'success', title: '工作流已保存', message: 'DAG 节点与关联配置已持久化至后端' });
+    addToast({ type: 'success', title: '工作流已保存', message: 'DAG 拓扑节点与关联网关已持久化至后端' });
+    return updatedWf;
   } catch (err: any) {
     const idx = state.workflows.findIndex((w) => w.id === id);
     if (idx !== -1) {
@@ -636,19 +671,23 @@ export async function updateWorkflow(id: string, updates: Partial<Workflow>) {
         updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       };
     }
-    addToast({ type: 'info', title: '本地配置已更新', message: `接口同步风险: ${err.message}` });
+    addToast({ type: 'error', title: '保存工作流失败', message: err.message || '网络或服务端报错' });
+    return null;
   }
 }
 
 export async function deleteWorkflow(id: string) {
   try {
     await api.deleteWorkflow(id);
+    addToast({ type: 'success', title: '移除完成', message: `工作流已从数据库成功删除` });
   } catch (err: any) {
-    console.warn('API 删除失败，本地同步过滤:', err.message);
+    addToast({ type: 'info', title: '本地已移除', message: `后端提示: ${err.message}` });
+  } finally {
+    state.workflows = state.workflows.filter((w) => w.id !== id);
+    if (state.selectedWorkflowId === id) {
+      state.selectedWorkflowId = state.workflows[0]?.id || '';
+    }
   }
-  const wf = state.workflows.find((w) => w.id === id);
-  state.workflows = state.workflows.filter((w) => w.id !== id);
-  addToast({ type: 'info', title: '移除完成', message: `工作流「${wf?.name || id}」已从库中删除` });
 }
 
 export async function copyWorkflow(id: string) {
@@ -700,7 +739,7 @@ export async function validateWorkflow(wf: Workflow) {
   }
 }
 
-export async function triggerRun(workflowId: string, inputMsg = '执行即时推流任务') {
+export async function triggerRun(workflowId: string, inputMsg: string) {
   try {
     const runDto = await api.triggerRun(workflowId, inputMsg);
     const newRun = mapRunDtoToRunRecord(runDto);
@@ -710,42 +749,9 @@ export async function triggerRun(workflowId: string, inputMsg = '执行即时推
     addToast({ type: 'info', title: '任务已提交引擎', message: `运行 ID: #${newRun.id} 已开始实时推流` });
     return newRun;
   } catch (err: any) {
-    const wf = state.workflows.find((w) => w.id === workflowId);
-    const runId = `run-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newRun: RunRecord = {
-      id: runId,
-      workflowId,
-      workflowName: wf?.name || '自定义触发任务',
-      status: 'running',
-      startTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      durationMs: 1200,
-      tokensUsed: 890,
-      triggerType: 'manual',
-      currentNode: 'node-1',
-      totalNodes: (wf?.nodes || []).length || 2,
-      completedNodes: 1,
-      nodeStates: [
-        {
-          nodeId: 'node-start',
-          nodeName: '开始节点',
-          status: 'success',
-          durationMs: 120,
-          tokens: 0,
-          inputJson: JSON.stringify({ input: inputMsg }),
-          outputJson: '{"status": "initialized"}',
-        },
-      ],
-      logs: [
-        { timestamp: new Date().toTimeString().slice(0, 8), level: 'info', message: `手动触发工作流 [${wf?.name}] 执行` },
-      ],
-    };
-
-    state.runs.unshift(newRun);
-    state.selectedRunId = runId;
-    state.route = 'workflow-monitor';
-    addToast({ type: 'info', title: '模拟模式下发引擎', message: `错误提示: ${err.message}，已启动沙箱运行 ID: #${runId}` });
-    return newRun;
+    const errMsg = err.response?.data?.message || err.message || '调度工作流失败';
+    addToast({ type: 'error', title: '工作流调度失败', message: errMsg });
+    throw new Error(errMsg);
   }
 }
 
@@ -1163,6 +1169,7 @@ export function useAppStore() {
     fetchAllData,
     fetchAgents,
     fetchWorkflows,
+    fetchWorkflowDetail,
     fetchMcpServers,
     fetchLlmProviders,
     fetchRuns,

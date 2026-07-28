@@ -95,11 +95,11 @@
             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">DAG 拓扑节点</div>
             <div class="flex items-center gap-2 text-xs font-mono font-semibold text-slate-700">
               <span class="bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-                {{ wf.nodes.length }} 算子节点
+                {{ wf.nodeCount ?? wf.nodes?.length ?? 0 }} 算子节点
               </span>
               <span class="text-slate-400">&rarr;</span>
               <span class="bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-                {{ wf.edges.length }} 有向边
+                {{ wf.edgeCount ?? wf.edges?.length ?? 0 }} 有向边
               </span>
             </div>
           </div>
@@ -119,7 +119,7 @@
               画布编辑
             </button>
             <button
-              @click="triggerRun(wf.id)"
+              @click="openRunDialog(wf)"
               class="px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5"
             >
               <Play class="w-3.5 h-3.5 fill-current" />
@@ -144,6 +144,13 @@
         <span>新建工作流</span>
       </button>
     </div>
+
+    <!-- Execution Input Modal -->
+    <RunInputDialog
+      :is-open="runDialogOpen"
+      :workflow="selectedWfForRun"
+      @close="runDialogOpen = false"
+    />
   </div>
 </template>
 
@@ -151,11 +158,20 @@
 import { ref, computed, watch } from 'vue';
 import { GitFork, Plus, Search, Copy, Trash2, Play } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
+import RunInputDialog from '../common/RunInputDialog.vue';
+import { Workflow } from '../../types';
 
-const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, triggerRun, fetchWorkflows } = useAppStore();
+const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows } = useAppStore();
 
 const searchQuery = ref('');
 const statusFilter = ref('all');
+const runDialogOpen = ref(false);
+const selectedWfForRun = ref<Workflow | null>(null);
+
+function openRunDialog(wf: Workflow) {
+  selectedWfForRun.value = wf;
+  runDialogOpen.value = true;
+}
 
 let searchTimer: any = null;
 watch(searchQuery, (newVal) => {

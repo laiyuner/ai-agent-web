@@ -105,11 +105,13 @@ export interface DAGNodeData {
   inputMappings?: { variable: string; sourceNodeId: string; sourceOutputKey: string }[];
   timeoutSeconds?: number;
   retries?: number;
+  config?: any;
+  nodeType?: string;
 }
 
 export interface DAGNode {
   id: string;
-  type: 'agentNode' | 'startNode' | 'endNode' | 'toolNode';
+  type: 'agentNode' | 'startNode' | 'endNode' | 'toolNode' | 'conditionNode';
   position: { x: number; y: number };
   data: DAGNodeData;
   status?: 'idle' | 'running' | 'success' | 'failed';
@@ -121,6 +123,7 @@ export interface DAGEdge {
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
+  condition?: string;
 }
 
 export interface Workflow {
@@ -131,6 +134,8 @@ export interface Workflow {
   isPublic: boolean;
   nodes: DAGNode[];
   edges: DAGEdge[];
+  nodeCount?: number;
+  edgeCount?: number;
   updatedAt: string;
   author: string;
   authorAvatar?: string;

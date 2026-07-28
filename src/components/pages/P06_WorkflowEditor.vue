@@ -1,17 +1,41 @@
 <template>
-  <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-slate-900 text-slate-100 overflow-hidden">
+  <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-slate-900 text-slate-100 overflow-hidden relative">
+    <!-- Loading Overlay -->
+    <div
+      v-if="loading"
+      class="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-3"
+    >
+      <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs text-slate-300 font-medium">正在获取完整 DAG 节点与有向拓扑链路...</p>
+    </div>
+
     <!-- Empty State View when no workflow exists -->
     <div
-      v-if="!currentWf"
-      class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-slate-950"
+      v-if="!currentWf && !loading"
+      class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-5 bg-slate-950"
     >
       <div class="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shadow-xl">
-        <Workflow class="w-8 h-8 text-indigo-400" />
+        <WorkflowIcon class="w-8 h-8 text-indigo-400" />
       </div>
       <div class="space-y-1.5 max-w-md">
-        <h3 class="text-base font-bold text-white">暂无可用 DAG 工作流</h3>
-        <p class="text-xs text-slate-400">目前数据库中尚未建立工作流编排。您可以快速创建一个全新的 DAG 工作流，或返回工作流列表。</p>
+        <h3 class="text-base font-bold text-white">全新 DAG 工作流画布</h3>
+        <p class="text-xs text-slate-400">目前尚未选中特定工作流。您可以快速创建一个全新的 DAG 工作流，或选择已有工作流载入拓扑。</p>
       </div>
+
+      <!-- Quick select existing workflow dropdown if workflows exist -->
+      <div v-if="state.workflows.length > 0" class="w-full max-w-xs space-y-1.5">
+        <label class="block text-[11px] font-semibold text-slate-400">载入已有工作流</label>
+        <select
+          @change="onSelectWorkflowFromEmptyState"
+          class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+        >
+          <option value="">-- 选择已有工作流模板 --</option>
+          <option v-for="wf in state.workflows" :key="wf.id" :value="wf.id">
+            {{ wf.name }} ({{ wf.nodeCount ?? wf.nodes?.length ?? 0 }} 算子)
+          </option>
+        </select>
+      </div>
+
       <div class="flex items-center gap-3 pt-2">
         <button
           @click="setRoute('workflows')"
@@ -30,13 +54,14 @@
     </div>
 
     <!-- Active Canvas Editor View -->
-    <template v-else>
+    <template v-else-if="currentWf">
       <!-- Top Canvas Toolbar -->
-      <div class="h-14 border-b border-slate-800 bg-slate-950/80 px-6 flex items-center justify-between shrink-0">
+      <div class="h-14 border-b border-slate-800 bg-slate-950/80 px-6 flex items-center justify-between shrink-0 z-30">
         <div class="flex items-center gap-4">
           <button
             @click="setRoute('workflows')"
-            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="返回列表"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <ArrowLeft class="w-4 h-4" />
           </button>
@@ -46,17 +71,21 @@
               <input
                 v-model="currentWf.name"
                 type="text"
+                placeholder="工作流名称"
                 class="bg-transparent text-sm font-bold text-white border-b border-transparent hover:border-slate-700 focus:border-indigo-500 focus:outline-none px-1"
               />
               <span
-                class="text-[10px] px-2 py-0.2 rounded-full font-semibold cursor-pointer select-none"
-                :class="currentWf.status === 'published' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'"
+                class="text-[10px] px-2.5 py-0.5 rounded-full font-bold cursor-pointer select-none transition-colors"
+                :class="currentWf.status === 'published' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'"
                 @click="togglePublishStatus"
+                :title="currentWf.status === 'published' ? '点击切换为草稿 (DRAFT) 允许修改' : '点击切换为上线 (PUBLISHED)'"
               >
-                {{ currentWf.status === 'published' ? '已上线' : '草稿' }}
+                {{ currentWf.status === 'published' ? '已上线 (PUBLISHED)' : '草稿 (DRAFT)' }}
               </span>
             </div>
-            <p class="text-[10px] text-slate-400 px-1">ID: {{ currentWf.id }} · {{ currentWf.nodes.length }} 算子</p>
+            <p class="text-[10px] text-slate-400 px-1">
+              ID: {{ currentWf.id }} · {{ currentWf.nodes?.length || 0 }} 算子节点 · {{ currentWf.edges?.length || 0 }} 有向边
+            </p>
           </div>
         </div>
 
@@ -67,25 +96,34 @@
             class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
           >
             <Bot class="w-3.5 h-3.5 text-indigo-400" />
-            <span>添加 Agent 算子</span>
+            <span>+ Agent 算子</span>
           </button>
 
           <button
             @click="addToolNode"
             class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
           >
-            <Server class="w-3.5 h-3.5 text-emerald-400" />
-            <span>添加 MCP 工具算子</span>
+            <Server class="w-3.5 h-3.5 text-amber-400" />
+            <span>+ MCP 工具</span>
+          </button>
+
+          <button
+            @click="addConditionNode"
+            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+          >
+            <Split class="w-3.5 h-3.5 text-cyan-400" />
+            <span>+ 条件分支</span>
           </button>
 
           <div class="h-4 w-px bg-slate-800 mx-1"></div>
 
           <button
             @click="saveCanvas"
-            class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+            :disabled="saving"
+            class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer disabled:opacity-50"
           >
             <Save class="w-3.5 h-3.5" />
-            <span>保存 DAG</span>
+            <span>{{ saving ? '保存中...' : '保存 DAG' }}</span>
           </button>
 
           <button
@@ -94,6 +132,14 @@
           >
             <Play class="w-3.5 h-3.5 fill-current" />
             <span>立即调度运行</span>
+          </button>
+
+          <button
+            @click="handleDeleteWorkflow"
+            title="删除工作流"
+            class="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 transition-colors cursor-pointer"
+          >
+            <Trash2 class="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -111,15 +157,22 @@
               @click="addStartNode"
               class="w-full p-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-slate-700 text-left transition-colors flex items-center gap-2 text-xs cursor-pointer"
             >
-              <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+              <div class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></div>
               <span>Webhook / API 触发器</span>
             </button>
             <button
               @click="addEndNode"
               class="w-full p-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-slate-700 text-left transition-colors flex items-center gap-2 text-xs cursor-pointer"
             >
-              <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+              <div class="w-3 h-3 rounded-full bg-rose-500 shrink-0"></div>
               <span>终点与结构化输出</span>
+            </button>
+            <button
+              @click="addConditionNode"
+              class="w-full p-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-slate-700 text-left transition-colors flex items-center gap-2 text-xs cursor-pointer"
+            >
+              <div class="w-3 h-3 rounded-full bg-cyan-500 shrink-0"></div>
+              <span>条件逻辑判断节点</span>
             </button>
           </div>
 
@@ -208,14 +261,16 @@
                   : node.type === 'endNode'
                   ? 'border-rose-500/40 bg-rose-950/20'
                   : node.type === 'toolNode'
-                  ? 'border-amber-500/40 bg-slate-900'
+                  ? 'border-amber-500/40 bg-amber-950/20'
+                  : node.type === 'conditionNode'
+                  ? 'border-cyan-500/40 bg-cyan-950/20'
                   : 'border-slate-700 bg-slate-800/90 hover:border-slate-600'
               "
             >
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <div
-                    class="w-3 h-3 rounded-full"
+                    class="w-3 h-3 rounded-full shrink-0"
                     :class="
                       node.type === 'startNode'
                         ? 'bg-emerald-500'
@@ -223,6 +278,8 @@
                         ? 'bg-rose-500'
                         : node.type === 'toolNode'
                         ? 'bg-amber-500'
+                        : node.type === 'conditionNode'
+                        ? 'bg-cyan-500'
                         : 'bg-indigo-500'
                     "
                   ></div>
@@ -239,18 +296,23 @@
               <div v-if="node.type === 'agentNode'" class="text-[10px] space-y-1 text-slate-400 pt-1 border-t border-slate-700/60">
                 <div class="flex justify-between">
                   <span>绑定 Agent:</span>
-                  <span class="text-indigo-300 font-medium">{{ node.data.agentName || '默认 ReAct' }}</span>
+                  <span class="text-indigo-300 font-medium">{{ node.data.agentName || '默认 Agent' }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span>LLM 模型:</span>
-                  <span class="text-slate-200">{{ node.data.llmModel || 'gpt-4o' }}</span>
+                  <span class="text-slate-200">{{ node.data.llmModel || 'qwen-max' }}</span>
                 </div>
               </div>
 
+              <div v-else-if="node.type === 'conditionNode'" class="text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
+                <span>分支逻辑节点</span>
+              </div>
+
               <!-- Edge Connection Handles -->
-              <div class="flex justify-between items-center text-[9px] text-slate-500 pt-1">
-                <span>输入端口 •</span>
-                <span>• 输出端口</span>
+              <div class="flex justify-between items-center text-[9px] text-slate-500 pt-1 border-t border-slate-800/50">
+                <span class="text-slate-400 font-mono">In</span>
+                <span class="text-indigo-400 font-mono font-semibold">{{ node.id }}</span>
+                <span class="text-slate-400 font-mono">Out</span>
               </div>
             </div>
           </div>
@@ -325,8 +387,53 @@
               </div>
             </div>
 
+            <!-- Connect to other nodes -->
+            <div class="pt-3 border-t border-slate-800 space-y-2">
+              <label class="block text-slate-400 font-medium flex items-center justify-between">
+                <span>添加下游连接链路 (Directed Edge)</span>
+                <Link class="w-3.5 h-3.5 text-indigo-400" />
+              </label>
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="connectTargetId"
+                  class="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none text-xs"
+                >
+                  <option value="">-- 选择目标节点 --</option>
+                  <option
+                    v-for="n in availableTargetNodes"
+                    :key="n.id"
+                    :value="n.id"
+                  >
+                    {{ n.data.label }} ({{ n.id }})
+                  </option>
+                </select>
+                <button
+                  @click="addConnectionToTarget"
+                  :disabled="!connectTargetId"
+                  class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  连接
+                </button>
+              </div>
+            </div>
+
+            <!-- Outgoing Edges List -->
+            <div v-if="outgoingEdges.length > 0" class="space-y-1.5 pt-2">
+              <div class="text-[11px] font-semibold text-slate-400">已建立的输出连线:</div>
+              <div
+                v-for="edge in outgoingEdges"
+                :key="edge.id"
+                class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 text-[11px]"
+              >
+                <span class="text-indigo-300 font-mono">&rarr; {{ edge.target }}</span>
+                <button @click="removeEdge(edge.id)" class="text-slate-500 hover:text-rose-400">
+                  <X class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
             <div>
-              <label class="block text-slate-400 font-medium mb-1">节点 ID (系统内核标识)</label>
+              <label class="block text-slate-400 font-medium mb-1">节点 Key (nodeKey)</label>
               <input
                 :value="selectedNode.id"
                 disabled
@@ -337,6 +444,13 @@
         </div>
       </div>
     </template>
+
+    <!-- Execution Input Modal -->
+    <RunInputDialog
+      :is-open="runDialogOpen"
+      :workflow="currentWf"
+      @close="runDialogOpen = false"
+    />
   </div>
 </template>
 
@@ -351,55 +465,105 @@ import {
   Zap,
   X,
   Sliders,
-  Workflow,
+  Workflow as WorkflowIcon,
   Plus,
+  Trash2,
+  Split,
+  Link,
 } from 'lucide-vue-next';
-import { useAppStore, addWorkflow } from '../../stores/useAppStore';
+import { api, mapWorkflowDtoToWorkflow } from '../../api';
+import { useAppStore, addWorkflow, updateWorkflow, deleteWorkflow, addToast } from '../../stores/useAppStore';
+import RunInputDialog from '../common/RunInputDialog.vue';
 import { DAGNode, Workflow as WorkflowType } from '../../types';
 
-const { state, setRoute, updateWorkflow, triggerRun } = useAppStore();
+const { state, setRoute } = useAppStore();
 
-const activeStoreWf = computed(() => {
-  if (!state.workflows || state.workflows.length === 0) return null;
-  return state.workflows.find((w) => w.id === state.selectedWorkflowId) || state.workflows[0] || null;
-});
-
+const loading = ref(false);
+const saving = ref(false);
+const runDialogOpen = ref(false);
 const currentWf = ref<WorkflowType | null>(null);
-
-watch(
-  activeStoreWf,
-  (newWf) => {
-    if (newWf) {
-      currentWf.value = JSON.parse(JSON.stringify(newWf));
-    } else {
-      currentWf.value = null;
-    }
-  },
-  { immediate: true, deep: true }
-);
-
 const selectedNodeId = ref<string | null>(null);
+const connectTargetId = ref<string>('');
 
 const selectedNode = computed(() => {
   if (!selectedNodeId.value || !currentWf.value) return null;
   return currentWf.value.nodes.find((n) => n.id === selectedNodeId.value) || null;
 });
 
+const availableTargetNodes = computed(() => {
+  if (!selectedNode.value || !currentWf.value) return [];
+  return currentWf.value.nodes.filter((n) => n.id !== selectedNode.value?.id);
+});
+
+const outgoingEdges = computed(() => {
+  if (!selectedNode.value || !currentWf.value) return [];
+  return currentWf.value.edges.filter((e) => e.source === selectedNode.value?.id);
+});
+
+async function loadWorkflowDetail(id: string) {
+  if (!id) return;
+  loading.value = true;
+  try {
+    const dto = await api.getWorkflow(id);
+    if (dto) {
+      currentWf.value = mapWorkflowDtoToWorkflow(dto);
+      // Hydrate agent metadata for agent nodes
+      if (currentWf.value && currentWf.value.nodes) {
+        currentWf.value.nodes.forEach((n) => {
+          if (n.type === 'agentNode' && n.data.agentId) {
+            const ag = state.agents.find((a) => String(a.id) === String(n.data.agentId));
+            if (ag) {
+              n.data.agentName = ag.name;
+              n.data.llmModel = ag.model;
+            }
+          }
+        });
+      }
+    } else {
+      currentWf.value = null;
+    }
+  } catch (err: any) {
+    addToast({ type: 'error', title: '加载工作流画布失败', message: err.message || '无法获取工作流拓扑详情' });
+    currentWf.value = null;
+  } finally {
+    loading.value = false;
+  }
+}
+
+watch(
+  () => state.selectedWorkflowId,
+  (newId) => {
+    if (newId) {
+      loadWorkflowDetail(newId);
+    } else {
+      currentWf.value = null;
+    }
+  },
+  { immediate: true }
+);
+
+function onSelectWorkflowFromEmptyState(e: Event) {
+  const target = e.target as HTMLSelectElement;
+  if (target.value) {
+    state.selectedWorkflowId = target.value;
+  }
+}
+
 async function createNewWorkflowInEditor() {
   const newWf = await addWorkflow({
     name: '新建 DAG 工作流',
-    description: '通过 DAG 可视化画布创建的工作流',
+    description: '通过 DAG 可视化画布创建的工作流模板',
     status: 'draft',
     isPublic: false,
     nodes: [
       {
-        id: 'node-start-1001',
+        id: 'node-start-1',
         type: 'startNode',
         position: { x: 120, y: 180 },
         data: { label: 'Webhook HTTP 触发器' },
       },
       {
-        id: 'node-end-1002',
+        id: 'node-end-1',
         type: 'endNode',
         position: { x: 650, y: 180 },
         data: { label: '结构化 JSON 响应' },
@@ -409,6 +573,7 @@ async function createNewWorkflowInEditor() {
   });
   if (newWf) {
     state.selectedWorkflowId = newWf.id;
+    await loadWorkflowDetail(newWf.id);
   }
 }
 
@@ -417,20 +582,49 @@ function togglePublishStatus() {
   currentWf.value.status = currentWf.value.status === 'published' ? 'draft' : 'published';
 }
 
-function saveCanvas() {
+async function saveCanvas() {
   if (!currentWf.value) return;
-  updateWorkflow(currentWf.value.id, {
-    name: currentWf.value.name,
-    status: currentWf.value.status,
-    nodes: currentWf.value.nodes,
-    edges: currentWf.value.edges,
-  });
+
+  if (currentWf.value.status === 'published') {
+    addToast({
+      type: 'warning',
+      title: '当前工作流处于已上线 (PUBLISHED) 状态',
+      message: '注意：已上线工作流不可直接保存修改。请在页面上方将状态切换为【草稿 (DRAFT)】后再保存。',
+    });
+    return;
+  }
+
+  saving.value = true;
+  try {
+    const res = await updateWorkflow(currentWf.value.id, {
+      name: currentWf.value.name,
+      description: currentWf.value.description,
+      status: currentWf.value.status,
+      nodes: currentWf.value.nodes,
+      edges: currentWf.value.edges,
+    });
+    if (res) {
+      currentWf.value = res;
+    }
+  } finally {
+    saving.value = false;
+  }
 }
 
-function handleRun() {
+async function handleDeleteWorkflow() {
   if (!currentWf.value) return;
-  saveCanvas();
-  triggerRun(currentWf.value.id);
+  if (confirm(`确定要删除工作流「${currentWf.value.name}」吗？`)) {
+    await deleteWorkflow(currentWf.value.id);
+    setRoute('workflows');
+  }
+}
+
+async function handleRun() {
+  if (!currentWf.value) return;
+  if (currentWf.value.status === 'draft') {
+    await saveCanvas();
+  }
+  runDialogOpen.value = true;
 }
 
 function addStartNode() {
@@ -439,7 +633,7 @@ function addStartNode() {
   currentWf.value.nodes.push({
     id,
     type: 'startNode',
-    position: { x: 120, y: 150 + currentWf.value.nodes.length * 30 },
+    position: { x: 120, y: 150 + (currentWf.value.nodes.length % 5) * 30 },
     data: { label: '自定义 HTTP 触发器' },
   });
 }
@@ -450,27 +644,38 @@ function addEndNode() {
   currentWf.value.nodes.push({
     id,
     type: 'endNode',
-    position: { x: 650, y: 150 + currentWf.value.nodes.length * 30 },
+    position: { x: 650, y: 150 + (currentWf.value.nodes.length % 5) * 30 },
     data: { label: '结构化 JSON 响应' },
+  });
+}
+
+function addConditionNode() {
+  if (!currentWf.value) return;
+  const id = `node-cond-${Date.now().toString().slice(-4)}`;
+  currentWf.value.nodes.push({
+    id,
+    type: 'conditionNode',
+    position: { x: 400, y: 180 },
+    data: { label: '条件分支逻辑判断' },
   });
 }
 
 function addAgentNode() {
   const ag = state.agents[0];
   if (ag) addSpecificAgentNode(ag);
-  else addSpecificAgentNode({ name: '通义千问 Agent', type: 'ReAct', id: 'ag-default' });
+  else addSpecificAgentNode({ name: '通义千问 Agent', type: 'ReAct', id: '1' });
 }
 
 function addSpecificAgentNode(ag: any) {
   if (!currentWf.value) return;
-  const id = `node-${Date.now().toString().slice(-4)}`;
+  const id = `node-agent-${Date.now().toString().slice(-4)}`;
   const newNode: DAGNode = {
     id,
     type: 'agentNode',
-    position: { x: 300, y: 150 + currentWf.value.nodes.length * 20 },
+    position: { x: 320, y: 150 + (currentWf.value.nodes.length % 5) * 25 },
     data: {
       label: ag.name,
-      agentId: ag.id,
+      agentId: String(ag.id),
       agentName: ag.name,
       agentType: ag.type,
       llmModel: ag.model || 'qwen-max',
@@ -484,7 +689,7 @@ function addSpecificAgentNode(ag: any) {
   const startNode = currentWf.value.nodes.find((n) => n.type === 'startNode');
   if (startNode) {
     currentWf.value.edges.push({
-      id: `e-${startNode.id}-${id}`,
+      id: `${startNode.id}-${id}`,
       source: startNode.id,
       target: id,
     });
@@ -501,7 +706,7 @@ function addSpecificToolNode(name: string) {
   currentWf.value.nodes.push({
     id,
     type: 'toolNode',
-    position: { x: 450, y: 180 },
+    position: { x: 480, y: 180 },
     data: { label: name },
   });
 }
@@ -513,9 +718,29 @@ function removeNode(id: string) {
   if (selectedNodeId.value === id) selectedNodeId.value = null;
 }
 
+function addConnectionToTarget() {
+  if (!selectedNode.value || !connectTargetId.value || !currentWf.value) return;
+  const source = selectedNode.value.id;
+  const target = connectTargetId.value;
+  const existing = currentWf.value.edges.find((e) => e.source === source && e.target === target);
+  if (!existing) {
+    currentWf.value.edges.push({
+      id: `${source}-${target}`,
+      source,
+      target,
+    });
+  }
+  connectTargetId.value = '';
+}
+
+function removeEdge(edgeId: string) {
+  if (!currentWf.value) return;
+  currentWf.value.edges = currentWf.value.edges.filter((e) => e.id !== edgeId);
+}
+
 function onAgentSelectChange() {
   if (selectedNode.value && selectedNode.value.data.agentId) {
-    const ag = state.agents.find((a) => a.id === selectedNode.value?.data.agentId);
+    const ag = state.agents.find((a) => String(a.id) === String(selectedNode.value?.data.agentId));
     if (ag) {
       selectedNode.value.data.agentName = ag.name;
       selectedNode.value.data.llmModel = ag.model;

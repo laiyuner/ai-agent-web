@@ -9,7 +9,7 @@
           <button
             v-for="item in group.items"
             :key="item.route"
-            @click="setRoute(item.route)"
+            @click="handleMenuClick(item.route)"
             class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all group"
             :class="
               state.route === item.route
@@ -70,6 +70,13 @@ import { useAppStore } from '../../stores/useAppStore';
 import { PageRoute } from '../../types';
 
 const { state, setRoute } = useAppStore();
+
+function handleMenuClick(route: PageRoute) {
+  if (route === 'workflow-edit') {
+    state.selectedWorkflowId = '';
+  }
+  setRoute(route);
+}
 
 const menuGroups = computed(() => [
   {

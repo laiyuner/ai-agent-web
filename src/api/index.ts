@@ -270,21 +270,40 @@ export function mapWorkflowDtoToWorkflow(dto: any): Workflow {
   const rawNodes = Array.isArray(dto.nodes) ? dto.nodes : [];
   const rawEdges = Array.isArray(dto.edges) ? dto.edges : [];
 
-  const nodes = rawNodes.map((n: any) => ({
-    id: n.nodeKey || `node-${n.id}`,
-    type: 'agentNode' as const,
-    position: { x: n.positionX || 100, y: n.positionY || 100 },
-    data: {
-      label: n.nodeKey || '推理节点',
-      agentId: n.agentId ? String(n.agentId) : undefined,
-    },
-  }));
+  const nodes = rawNodes.map((n: any) => {
+    let nodeType: 'agentNode' | 'startNode' | 'endNode' | 'toolNode' | 'conditionNode' = 'agentNode';
+    const rawType = String(n.nodeType || '').toUpperCase();
+    if (rawType === 'START' || n.type === 'startNode') nodeType = 'startNode';
+    else if (rawType === 'END' || n.type === 'endNode') nodeType = 'endNode';
+    else if (rawType === 'TOOL' || n.type === 'toolNode') nodeType = 'toolNode';
+    else if (rawType === 'CONDITION' || n.type === 'conditionNode') nodeType = 'conditionNode';
 
-  const edges = rawEdges.map((e: any) => ({
-    id: `${e.sourceNodeKey}-${e.targetNodeKey}`,
-    source: e.sourceNodeKey,
-    target: e.targetNodeKey,
-  }));
+    return {
+      id: n.nodeKey || (n.id ? `node-${n.id}` : `node-${Math.random().toString(36).slice(2, 6)}`),
+      type: nodeType,
+      position: {
+        x: typeof n.positionX === 'number' ? n.positionX : (n.position?.x ?? 100),
+        y: typeof n.positionY === 'number' ? n.positionY : (n.position?.y ?? 100),
+      },
+      data: {
+        label: n.name || n.label || n.nodeKey || '算子节点',
+        agentId: n.agentId ? String(n.agentId) : undefined,
+        config: n.config || {},
+        nodeType: n.nodeType,
+      },
+    };
+  });
+
+  const edges = rawEdges.map((e: any) => {
+    const source = e.sourceNodeKey || e.source || '';
+    const target = e.targetNodeKey || e.target || '';
+    return {
+      id: e.id ? String(e.id) : `${source}-${target}`,
+      source,
+      target,
+      condition: e.condition || undefined,
+    };
+  });
 
   return {
     id: String(dto.id),
@@ -294,8 +313,10 @@ export function mapWorkflowDtoToWorkflow(dto: any): Workflow {
     isPublic: !!dto.isPublic,
     nodes,
     edges,
+    nodeCount: typeof dto.nodeCount === 'number' ? dto.nodeCount : nodes.length,
+    edgeCount: typeof dto.edgeCount === 'number' ? dto.edgeCount : edges.length,
     updatedAt: dto.updatedAt ? dto.updatedAt.replace('T', ' ').slice(0, 16) : new Date().toISOString().slice(0, 16),
-    author: String(dto.ownerId || '系统管理员'),
+    author: dto.creatorName || String(dto.ownerId || '系统管理员'),
   };
 }
 

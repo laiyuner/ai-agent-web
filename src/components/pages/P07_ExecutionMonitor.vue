@@ -56,14 +56,21 @@
         </button>
 
         <button
-          @click="triggerRun(currentRun.workflowId)"
-          class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2"
+          @click="openReRunDialog"
+          class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
         >
           <RotateCcw class="w-4 h-4" />
           <span>重新调度</span>
         </button>
       </div>
     </div>
+
+    <!-- Execution Input Modal -->
+    <RunInputDialog
+      :is-open="runDialogOpen"
+      :workflow="selectedWfForRun"
+      @close="runDialogOpen = false"
+    />
 
     <!-- Execution Stats Bar -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-5">
@@ -223,13 +230,39 @@ import {
   GitFork,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { RunRecord, RunNodeState } from '../../types';
+import RunInputDialog from '../common/RunInputDialog.vue';
+import { RunRecord, RunNodeState, Workflow } from '../../types';
 
-const { state, setRoute, stopRun, triggerRun } = useAppStore();
+const { state, setRoute, stopRun } = useAppStore();
+
+const runDialogOpen = ref(false);
 
 const currentRun = computed<RunRecord | null>(() => {
   return state.runs.find((r) => r.id === state.selectedRunId) || state.runs[0] || null;
 });
+
+const selectedWfForRun = computed<Workflow | null>(() => {
+  if (!currentRun.value) return null;
+  const found = state.workflows.find((w) => w.id === currentRun.value?.workflowId);
+  if (found) return found;
+  return {
+    id: currentRun.value.workflowId,
+    name: currentRun.value.workflowName,
+    description: '',
+    status: 'published',
+    isPublic: true,
+    nodes: [],
+    edges: [],
+    updatedAt: '',
+    author: '',
+  };
+});
+
+function openReRunDialog() {
+  if (currentRun.value) {
+    runDialogOpen.value = true;
+  }
+}
 
 const selectedNodeState = ref<RunNodeState | null>(
   currentRun.value?.nodeStates?.[0] || null
