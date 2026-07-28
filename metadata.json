@@ -1,0 +1,6 @@
+{
+  "name": "AgentForge",
+  "description": "企业级多智能体协同调度引擎",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

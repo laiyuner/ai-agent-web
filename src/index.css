@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --app-font-scale: 1;
+  }
+
+  /* 智能 Fluid Typography: 针对不同尺寸屏幕提供原生舒适的基准 Root Font Size */
+  html {
+    font-size: calc(16px * var(--app-font-scale, 1));
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    transition: font-size 0.2s ease-out;
+  }
+
+  /* 针对 17 英寸高分辨率笔记本 (如 1600px ~ 1920px 显示屏) 进行大厂专有基准调优 */
+  @media (min-width: 1600px) {
+    html {
+      font-size: calc(17px * var(--app-font-scale, 1));
+    }
+  }
+
+  /* 针对 2K / 4K / 超宽显示屏 */
+  @media (min-width: 1920px) {
+    html {
+      font-size: calc(18px * var(--app-font-scale, 1));
+    }
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    overflow-x: hidden;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+}
