@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useAppStore } from './stores/useAppStore';
 
 import Header from './components/common/Header.vue';
@@ -47,7 +47,17 @@ import P15_UserManagement from './components/pages/P15_UserManagement.vue';
 import P16_RoleManagement from './components/pages/P16_RoleManagement.vue';
 import P17_Profile from './components/pages/P17_Profile.vue';
 
-const { state } = useAppStore();
+const { state, refreshRouteData } = useAppStore();
+
+watch(
+  [() => state.route, () => state.isLoggedIn],
+  ([newRoute, isLoggedIn]) => {
+    if (isLoggedIn && newRoute && newRoute !== 'login') {
+      refreshRouteData(newRoute);
+    }
+  },
+  { immediate: true }
+);
 
 const currentPageComponent = computed(() => {
   switch (state.route) {

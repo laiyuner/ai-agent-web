@@ -148,14 +148,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { GitFork, Plus, Search, Copy, Trash2, Play } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 
-const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, triggerRun } = useAppStore();
+const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, triggerRun, fetchWorkflows } = useAppStore();
 
 const searchQuery = ref('');
 const statusFilter = ref('all');
+
+let searchTimer: any = null;
+watch(searchQuery, (newVal) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    fetchWorkflows(newVal);
+  }, 300);
+});
 
 const filterOptions = [
   { label: '全部', value: 'all' },

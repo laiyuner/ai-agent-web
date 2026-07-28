@@ -245,9 +245,80 @@ export function removeToast(id: string) {
   state.toasts = state.toasts.filter((t) => t.id !== id);
 }
 
-// Router Helper
+// Router Helper & Dynamic Route Data Refresher
+export async function refreshRouteData(r: PageRoute) {
+  if (!state.isLoggedIn) return;
+
+  switch (r) {
+    case 'dashboard':
+      await Promise.allSettled([
+        fetchDashboardStats(),
+        fetchWorkflows(),
+        fetchRuns(),
+        fetchAgents(),
+        fetchMcpServers(),
+      ]);
+      break;
+    case 'workflows':
+      await fetchWorkflows();
+      break;
+    case 'workflow-edit':
+      await Promise.allSettled([
+        fetchWorkflows(),
+        fetchAgents(),
+        fetchMcpServers(),
+        fetchLlmProviders(),
+      ]);
+      break;
+    case 'workflow-monitor':
+      await Promise.allSettled([
+        fetchWorkflows(),
+        fetchRuns(),
+      ]);
+      break;
+    case 'agents':
+      await Promise.allSettled([
+        fetchAgents(),
+        fetchLlmProviders(),
+        fetchMcpServers(),
+      ]);
+      break;
+    case 'mcp-servers':
+      await fetchMcpServers();
+      break;
+    case 'llm-providers':
+      await fetchLlmProviders();
+      break;
+    case 'runs':
+    case 'run-detail':
+      await fetchRuns();
+      break;
+    case 'users':
+      await fetchUsers();
+      break;
+    case 'roles':
+      await fetchRoles();
+      break;
+    case 'profile':
+      try {
+        const meData = await api.getMe();
+        if (meData) {
+          state.currentUser = mapUserDtoToUser(meData);
+        }
+      } catch (err: any) {
+        console.warn('获取个人信息失败:', err.message);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 export function setRoute(r: PageRoute) {
   state.route = r;
+  if (state.isLoggedIn && r !== 'login') {
+    refreshRouteData(r);
+  }
 }
 
 // Auth Methods
@@ -1082,6 +1153,7 @@ export function useAppStore() {
     addToast,
     removeToast,
     setRoute,
+    refreshRouteData,
     setDisplayMode,
     applyDisplayScale,
     handleLoginApi,

@@ -132,15 +132,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Bot, Plus, Search, Copy, Trash2, Sliders } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import P09_AgentDrawer from './P09_AgentDrawer.vue';
 import { Agent } from '../../types';
 
-const { state, copyAgent, deleteAgent } = useAppStore();
+const { state, copyAgent, deleteAgent, fetchAgents } = useAppStore();
 
 const searchQuery = ref('');
+
+let searchTimer: any = null;
+watch(searchQuery, (newVal) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    fetchAgents(newVal);
+  }, 300);
+});
 
 const filteredAgents = computed(() => {
   return state.agents.filter((ag) => {
