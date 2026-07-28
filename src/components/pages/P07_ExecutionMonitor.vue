@@ -475,6 +475,8 @@ import {
   RotateCcw,
   Terminal,
   FileCode,
+  FileText,
+  Download,
   Wifi,
   WifiOff,
   Cpu,
@@ -533,6 +535,10 @@ const autoScroll = ref(true);
 
 // Selected node key
 const selectedNodeKey = ref<string | null>(null);
+
+// Node Output Display Area state
+const selectedOutputNodeKey = ref<string | null>(null);
+const nodeOutputDisplayContainer = ref<HTMLDivElement | null>(null);
 
 // Computed list of nodes for UI
 const nodeList = computed(() => {
@@ -604,6 +610,69 @@ const currentSelectedNodeOutput = computed(() => {
   return found?.outputJson || currentRun.value?.output || '等待输出...';
 });
 
+// All nodes for Output Display Area Tabs
+const allOutputNodes = computed(() => {
+  if (!currentRun.value) return [];
+  if (Array.isArray(currentRun.value.nodeRuns) && currentRun.value.nodeRuns.length > 0) {
+    return currentRun.value.nodeRuns.map((nr: any) => ({
+      nodeKey: nr.nodeKey || nr.nodeId || 'node-1',
+      nodeName: nr.nodeName || nr.nodeKey || '节点',
+      status: nr.status,
+    }));
+  }
+  return nodeList.value;
+});
+
+// Auto-select node tab for Output Display Area
+watch(
+  () => allOutputNodes.value,
+  (nodes) => {
+    if (nodes.length === 0) return;
+    if (!selectedOutputNodeKey.value || !nodes.some((n: any) => n.nodeKey === selectedOutputNodeKey.value)) {
+      const lastSuccess = [...nodes].reverse().find((n: any) => nodeStatuses[n.nodeKey] === 'SUCCESS');
+      selectedOutputNodeKey.value = lastSuccess?.nodeKey || nodes[nodes.length - 1]?.nodeKey || nodes[0].nodeKey;
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// Output text for selected node in Node Output Display Area
+const currentNodeOutputText = computed(() => {
+  if (!selectedOutputNodeKey.value) return '';
+
+  if (nodeOutputs[selectedOutputNodeKey.value]) {
+    return nodeOutputs[selectedOutputNodeKey.value];
+  }
+
+  if (Array.isArray(currentRun.value?.nodeRuns)) {
+    const found = currentRun.value.nodeRuns.find((n: any) => (n.nodeKey || n.nodeId) === selectedOutputNodeKey.value);
+    if (found?.output) {
+      return typeof found.output === 'object' ? JSON.stringify(found.output, null, 2) : String(found.output);
+    }
+    if (found?.outputJson) {
+      return typeof found.outputJson === 'object' ? JSON.stringify(found.outputJson, null, 2) : String(found.outputJson);
+    }
+  }
+
+  if (Array.isArray(currentRun.value?.nodeStates)) {
+    const found = currentRun.value.nodeStates.find((n: any) => (n.nodeId || n.nodeKey) === selectedOutputNodeKey.value);
+    if (found?.outputJson) {
+      return typeof found.outputJson === 'object' ? JSON.stringify(found.outputJson, null, 2) : String(found.outputJson);
+    }
+    if (found?.output) {
+      return typeof found.output === 'object' ? JSON.stringify(found.output, null, 2) : String(found.output);
+    }
+  }
+
+  if (allOutputNodes.value.length === 1 && currentRun.value?.output) {
+    return typeof currentRun.value.output === 'object'
+      ? JSON.stringify(currentRun.value.output, null, 2)
+      : String(currentRun.value.output);
+  }
+
+  return '';
+});
+
 // Auto-scroll output container on new streamed content
 watch(currentSelectedNodeOutput, () => {
   nextTick(() => {
@@ -612,6 +681,34 @@ watch(currentSelectedNodeOutput, () => {
     }
   });
 });
+
+watch(currentNodeOutputText, () => {
+  nextTick(() => {
+    if (nodeOutputDisplayContainer.value) {
+      nodeOutputDisplayContainer.value.scrollTop = nodeOutputDisplayContainer.value.scrollHeight;
+    }
+  });
+});
+
+function copyNodeOutput() {
+  if (!currentNodeOutputText.value) return;
+  copyText(currentNodeOutputText.value, 'nodeOutput');
+}
+
+function exportMarkdown() {
+  if (!currentNodeOutputText.value) return;
+  const blob = new Blob([currentNodeOutputText.value], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const wfName = currentRun.value?.workflowName || 'workflow';
+  const nodeKey = selectedOutputNodeKey.value || 'output';
+  a.download = `${wfName}_${nodeKey}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 // Computed filtered log stream for search/level filtering
 const filteredLogs = computed(() => {
@@ -843,6 +940,8 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       if (!selectedNodeKey.value) {
         selectedNodeKey.value = nodeKey;
       }
+      // Auto switch output display tab to currently streaming node
+      selectedOutputNodeKey.value = nodeKey;
       break;
     }
 
@@ -1049,6 +1148,12 @@ function loadHistoryData() {
       `工作流已被终止`,
       currentRun.value.finishedAt
     );
+  }
+
+  // 默认选中最后一个有输出的节点
+  const lastWithOutput = [...nodeRuns].reverse().find((n: any) => n.output || n.outputJson);
+  if (lastWithOutput) {
+    selectedOutputNodeKey.value = lastWithOutput.nodeKey || lastWithOutput.nodeId;
   }
 }
 
