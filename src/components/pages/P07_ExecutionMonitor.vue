@@ -519,6 +519,7 @@ const currentRun = ref<any>(null);
 const ws = ref<WebSocket | null>(null);
 const wsStatus = ref<string>('连接中...'); // 连接中.../已连接/已断开/重连中.../已完成
 const lastEventSeq = ref(0);
+const seenSeq = new Set<number>();
 const heartbeatTimer = ref<any>(null);
 const reconnectTimer = ref<any>(null);
 const runFinished = ref(false);
@@ -871,14 +872,28 @@ function connectWebSocket(runId: number | string, token: string) {
         ws.value.send(JSON.stringify({ type: 'heartbeat' }));
       }
     }, 25000);
+
+    // 连接成功后立即发送 replay 请求，拿回订阅前发出的全量/增量事件（如 node 1 的 NODE_STARTED）
+    const replayMsg: any = { type: 'replay', runId };
+    if (lastEventSeq.value > 0) {
+      replayMsg.lastEventSeq = lastEventSeq.value;
+    }
+    ws.value.send(JSON.stringify(replayMsg));
   };
 
   ws.value.onmessage = (event) => {
     try {
       const data: WebSocketEvent = JSON.parse(event.data);
 
-      if (data.eventSeq && data.eventSeq > lastEventSeq.value) {
-        lastEventSeq.value = data.eventSeq;
+      // 按 eventSeq 严格去重，避免 live 广播与 replay 重复导致 OUTPUT_CHUNK 翻倍
+      if (data.eventSeq != null) {
+        if (seenSeq.has(data.eventSeq)) {
+          return; // 重复事件，忽略
+        }
+        seenSeq.add(data.eventSeq);
+        if (data.eventSeq > lastEventSeq.value) {
+          lastEventSeq.value = data.eventSeq;
+        }
       }
 
       handleWebSocketEvent(data);
@@ -1056,18 +1071,6 @@ function handleWebSocketEvent(data: WebSocketEvent) {
 function reconnect(runId: number | string, token: string) {
   if (runFinished.value) return;
   connectWebSocket(runId, token);
-
-  setTimeout(() => {
-    if (ws.value?.readyState === WebSocket.OPEN) {
-      ws.value.send(
-        JSON.stringify({
-          type: 'replay',
-          runId,
-          lastEventSeq: lastEventSeq.value,
-        })
-      );
-    }
-  }, 500);
 }
 
 function disconnect() {
@@ -1228,7 +1231,9 @@ onMounted(async () => {
   // 2. Decide behavior according to run status
   const currentStatus = (currentRun.value.status || '').toUpperCase();
   if (currentStatus === 'RUNNING') {
-    // 运行中：建立 WebSocket 实时连接
+    // 运行中：重置序号缓存并建立 WebSocket 实时连接
+    lastEventSeq.value = 0;
+    seenSeq.clear();
     wsStatus.value = '连接中...';
     const token = tokenManager.getAccessToken() || 'mock-jwt-token';
     if (token && runId) {
