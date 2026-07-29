@@ -601,7 +601,8 @@ const currentSelectedNodeInput = computed(() => {
   if (!selectedNodeKey.value) return '{}';
   if (nodeInputs[selectedNodeKey.value]) return nodeInputs[selectedNodeKey.value];
   const found = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
-  return found?.inputJson || currentRun.value?.input || '{}';
+  if (found?.inputJson && found.inputJson !== '{}') return found.inputJson;
+  return currentRun.value?.input || found?.inputJson || '{}';
 });
 
 const currentSelectedNodeOutput = computed(() => {
