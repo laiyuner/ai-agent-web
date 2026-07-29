@@ -978,6 +978,13 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       nodeTokens[nodeKey] = totalTokens;
       nodeDurations[nodeKey] = data.payload?.durationMs || 0;
 
+      const inputVal = data.payload?.input;
+      if (inputVal != null) {
+        nodeInputs[nodeKey] = typeof inputVal === 'object'
+          ? JSON.stringify(inputVal, null, 2)
+          : String(inputVal);
+      }
+
       const finalOutput = data.payload?.output;
       nodeOutputs[nodeKey] = finalOutput == null
         ? ''
@@ -992,6 +999,14 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     case 'NODE_FAILED': {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'FAILED';
+
+      const inputVal = data.payload?.input;
+      if (inputVal != null) {
+        nodeInputs[nodeKey] = typeof inputVal === 'object'
+          ? JSON.stringify(inputVal, null, 2)
+          : String(inputVal);
+      }
+
       addLog('error', `节点 ${nodeKey} 失败: ${data.payload?.errorMsg || '报错终止'}`, data.timestamp);
       break;
     }
