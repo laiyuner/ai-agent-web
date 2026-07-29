@@ -114,13 +114,36 @@
           <div class="flex items-center gap-2">
             <button
               @click="openEditor(wf.id)"
-              class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200"
+              class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer"
             >
               画布编辑
             </button>
+
+            <!-- 上线按钮（草稿状态显示） -->
+            <button
+              v-if="wf.status !== 'published'"
+              @click="handlePublish(wf.id)"
+              class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="发布上线，允许生产调度"
+            >
+              <Upload class="w-3.5 h-3.5" />
+              <span>上线</span>
+            </button>
+
+            <!-- 下线按钮（已上线状态显示） -->
+            <button
+              v-else
+              @click="handleUnpublish(wf.id)"
+              class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="下线回草稿，可重新编辑"
+            >
+              <Download class="w-3.5 h-3.5" />
+              <span>下线</span>
+            </button>
+
             <button
               @click="openRunDialog(wf)"
-              class="px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5"
+              class="px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Play class="w-3.5 h-3.5 fill-current" />
               <span>调度</span>
@@ -156,12 +179,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { GitFork, Plus, Search, Copy, Trash2, Play } from 'lucide-vue-next';
+import { GitFork, Plus, Search, Copy, Trash2, Play, Upload, Download } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import RunInputDialog from '../common/RunInputDialog.vue';
 import { Workflow } from '../../types';
 
-const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows } = useAppStore();
+const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows, publishWorkflow, unpublishWorkflow } = useAppStore();
 
 const searchQuery = ref('');
 const statusFilter = ref('all');
@@ -171,6 +194,14 @@ const selectedWfForRun = ref<Workflow | null>(null);
 function openRunDialog(wf: Workflow) {
   selectedWfForRun.value = wf;
   runDialogOpen.value = true;
+}
+
+async function handlePublish(id: string) {
+  await publishWorkflow(id);
+}
+
+async function handleUnpublish(id: string) {
+  await unpublishWorkflow(id);
 }
 
 let searchTimer: any = null;

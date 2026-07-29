@@ -384,16 +384,26 @@ export function mapLlmDtoToLlm(dto: any): LLMProvider {
 export function mapRunDtoToRunRecord(dto: any): RunRecord {
   const rawNodeRuns = Array.isArray(dto.nodeRuns) ? dto.nodeRuns : [];
 
-  const nodeStates = rawNodeRuns.map((nr: any) => ({
-    nodeId: nr.nodeKey || String(nr.id),
-    nodeName: nr.nodeKey || '推流节点',
-    status: (nr.status === 'SUCCESS' ? 'success' : nr.status === 'FAILED' ? 'failed' : nr.status === 'TERMINATED' ? 'terminated' : 'running') as any,
-    durationMs: nr.finishedAt && nr.startedAt ? new Date(nr.finishedAt).getTime() - new Date(nr.startedAt).getTime() : 0,
-    tokens: 0,
-    inputJson: '{}',
-    outputJson: nr.output || '{}',
-    error: nr.errorMsg || undefined,
-  }));
+  const nodeStates = rawNodeRuns.map((nr: any) => {
+    const tu = nr.tokensUsed;
+    const totalTokens = typeof tu === 'object' && tu !== null
+      ? (tu.totalTokens || tu.total_tokens || 0)
+      : (typeof tu === 'number' ? tu : 0);
+    return {
+      nodeId: nr.nodeKey || String(nr.id),
+      nodeName: nr.nodeKey || '推流节点',
+      status: (nr.status === 'SUCCESS' ? 'success' : nr.status === 'FAILED' ? 'failed' : nr.status === 'TERMINATED' ? 'terminated' : 'running') as any,
+      durationMs: nr.finishedAt && nr.startedAt ? new Date(nr.finishedAt).getTime() - new Date(nr.startedAt).getTime() : 0,
+      tokens: totalTokens,
+      inputJson: nr.inputContext
+        ? (typeof nr.inputContext === 'object'
+           ? JSON.stringify(nr.inputContext, null, 2)
+           : String(nr.inputContext))
+        : '{}',
+      outputJson: nr.output || '{}',
+      error: nr.errorMsg || undefined,
+    };
+  });
 
   let status: any = 'running';
   if (dto.status === 'SUCCESS') status = 'success';
@@ -522,6 +532,10 @@ export const api = {
   },
   publishWorkflow: async (id: string | number) => {
     const res = await request.post(`/workflows/${id}/publish`);
+    return res.data?.data || res.data;
+  },
+  unpublishWorkflow: async (id: string | number) => {
+    const res = await request.post(`/workflows/${id}/unpublish`);
     return res.data?.data || res.data;
   },
   cloneWorkflow: async (id: string | number, name: string) => {

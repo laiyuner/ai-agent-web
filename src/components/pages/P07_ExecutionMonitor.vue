@@ -175,10 +175,11 @@
             <!-- Typewriter stream badge -->
             <div
               v-if="nodeOutputs[node.nodeKey]"
-              class="pt-1 flex items-center gap-1.5 text-[11px] text-indigo-600 font-semibold"
+              class="pt-1 flex items-center gap-1.5 text-[11px] font-semibold"
+              :class="getNodeStatus(node.nodeKey) === 'RUNNING' ? 'text-indigo-600' : 'text-slate-400'"
             >
-              <Sparkles class="w-3 h-3 animate-spin" />
-              <span>包含实时打字机输出分片</span>
+              <Sparkles class="w-3 h-3" :class="{ 'animate-spin': getNodeStatus(node.nodeKey) === 'RUNNING' }" />
+              <span>{{ getNodeStatus(node.nodeKey) === 'RUNNING' ? '实时打字机输出中...' : '含流式输出分片' }}</span>
             </div>
           </div>
 
@@ -916,17 +917,29 @@ function handleWebSocketEvent(data: WebSocketEvent) {
   if (!currentRun.value) return;
 
   switch (data.eventType) {
-    case 'RUN_STARTED':
-      currentRun.value.status = 'RUNNING';
-      runFinished.value = false;
+    case 'RUN_STARTED': {
+      const currentStatus = (currentRun.value?.status || '').toUpperCase();
+      const isAlreadyFinished = currentStatus === 'SUCCESS' || currentStatus === 'FAILED' || currentStatus === 'TERMINATED';
+      if (!isAlreadyFinished) {
+        currentRun.value.status = 'RUNNING';
+        runFinished.value = false;
+      }
       addLog('info', `工作流开始执行`, data.timestamp);
       break;
+    }
 
     case 'NODE_STARTED': {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'RUNNING';
       nodeOutputs[nodeKey] = '';
       if (!selectedNodeKey.value) selectedNodeKey.value = nodeKey;
+
+      if (data.payload?.input) {
+        const inputVal = data.payload.input;
+        nodeInputs[nodeKey] = typeof inputVal === 'object'
+          ? JSON.stringify(inputVal, null, 2)
+          : String(inputVal);
+      }
 
       addLog('info', `节点 ${data.payload?.agentName || nodeKey} 开始执行`, data.timestamp);
       break;
@@ -957,16 +970,22 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     case 'NODE_FINISHED': {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'SUCCESS';
-      nodeTokens[nodeKey] = data.payload?.tokensUsed || 0;
+      
+      const tokensUsed = data.payload?.tokensUsed;
+      const totalTokens = typeof tokensUsed === 'object' && tokensUsed !== null
+        ? (tokensUsed.totalTokens || tokensUsed.total_tokens || 0)
+        : (typeof tokensUsed === 'number' ? tokensUsed : 0);
+      nodeTokens[nodeKey] = totalTokens;
       nodeDurations[nodeKey] = data.payload?.durationMs || 0;
 
-      if (data.payload?.output) {
-        nodeOutputs[nodeKey] = typeof data.payload.output === 'object'
-          ? JSON.stringify(data.payload.output, null, 2)
-          : String(data.payload.output);
-      }
+      const finalOutput = data.payload?.output;
+      nodeOutputs[nodeKey] = finalOutput == null
+        ? ''
+        : (typeof finalOutput === 'object'
+           ? JSON.stringify(finalOutput, null, 2)
+           : String(finalOutput));
 
-      addLog('info', `节点 ${nodeKey} 完成，Token: ${data.payload?.tokensUsed || 0}`, data.timestamp);
+      addLog('info', `节点 ${nodeKey} 完成，Token: ${totalTokens}`, data.timestamp);
       break;
     }
 

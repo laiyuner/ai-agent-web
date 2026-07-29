@@ -710,6 +710,17 @@ export async function publishWorkflow(id: string) {
   }
 }
 
+export async function unpublishWorkflow(id: string) {
+  try {
+    await api.unpublishWorkflow(id);
+    const wf = state.workflows.find((w) => w.id === id);
+    if (wf) wf.status = 'draft';
+    addToast({ type: 'success', title: '工作流已下线', message: '已切换状态为 DRAFT，可重新编辑' });
+  } catch (err: any) {
+    addToast({ type: 'error', title: '下线工作流失败', message: err.message });
+  }
+}
+
 export async function validateWorkflow(wf: Workflow) {
   try {
     const reqData = {
@@ -1177,6 +1188,7 @@ export function useAppStore() {
     deleteWorkflow,
     copyWorkflow,
     publishWorkflow,
+    unpublishWorkflow,
     validateWorkflow,
     triggerRun,
     stopRun,
