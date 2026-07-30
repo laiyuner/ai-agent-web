@@ -781,7 +781,7 @@ export async function triggerRun(workflowId: string, inputMsg: string) {
     const newRun = mapRunDtoToRunRecord(runDto);
     state.runs.unshift(newRun);
     state.selectedRunId = newRun.id;
-    state.route = 'workflow-monitor';
+    setRoute('workflow-monitor');
     addToast({ type: 'info', title: '任务已提交引擎', message: `运行 ID: #${newRun.id} 已开始实时推流` });
     return newRun;
   } catch (err: any) {
