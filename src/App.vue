@@ -9,5 +9,11 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import Toast from './components/common/Toast.vue';
+import { applyDisplayScale } from './stores/useAppStore';
+
+onMounted(() => {
+  applyDisplayScale();
+});
 </script>

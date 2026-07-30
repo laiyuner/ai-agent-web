@@ -8,9 +8,7 @@
       <Sidebar v-if="state.route !== 'workflow-edit'" />
 
       <main class="flex-1 overflow-y-auto bg-slate-100/80">
-        <div class="h-full max-w-7xl mx-auto space-y-6 p-4 sm:p-6 lg:p-8">
-          <router-view />
-        </div>
+        <router-view />
       </main>
     </div>
 
