@@ -192,14 +192,13 @@ const mockRuns: RunRecord[] = [
 export type DisplayMode = 'auto' | '100' | '110' | '125' | '90';
 
 const savedDisplayMode = ((typeof localStorage !== 'undefined' && localStorage.getItem('agentforge_display_mode')) || 'auto') as DisplayMode;
-const hasInitialToken = typeof localStorage !== 'undefined' && !!localStorage.getItem('agentforge_access_token');
 
 // Reactive Store State
 export const state = reactive({
-  isLoggedIn: hasInitialToken,
-  currentUser: (hasInitialToken ? mockUsers[0] : null) as User | null,
+  isLoggedIn: false,
+  currentUser: null as User | null,
   mustResetPasswordModalOpen: false,
-  route: (hasInitialToken ? 'dashboard' : 'login') as PageRoute,
+  route: 'login' as PageRoute,
 
   displayMode: savedDisplayMode,
 
@@ -243,6 +242,23 @@ export function addToast(toast: Omit<ToastMessage, 'id'>) {
 
 export function removeToast(id: string) {
   state.toasts = state.toasts.filter((t) => t.id !== id);
+}
+
+// Session Initializer for In-Memory Token Recovery
+export async function initUserFromSession() {
+  try {
+    const meData = await api.getMe();
+    if (meData) {
+      state.currentUser = mapUserDtoToUser(meData);
+      state.isLoggedIn = true;
+      return;
+    }
+  } catch (err: any) {
+    console.warn('获取当前用户信息失败，使用默认用户信息:', err.message);
+  }
+  // Fallback user if server user info endpoint is unpopulated
+  state.currentUser = mockUsers[0];
+  state.isLoggedIn = true;
 }
 
 // Router Helper & Dynamic Route Data Refresher
@@ -316,9 +332,12 @@ export async function refreshRouteData(r: PageRoute) {
 
 export function setRoute(r: PageRoute) {
   state.route = r;
-  if (state.isLoggedIn && r !== 'login') {
-    refreshRouteData(r);
-  }
+  import('../router').then(({ router, pageRouteToPath }) => {
+    const targetPath = pageRouteToPath[r] || '/dashboard';
+    if (router.currentRoute.value.path !== targetPath) {
+      router.push(targetPath);
+    }
+  });
 }
 
 // Auth Methods
@@ -327,13 +346,6 @@ export async function handleLoginApi(usernameVal: string, passwordVal: string): 
     const data = await api.login(usernameVal, passwordVal);
     if (data && data.accessToken) {
       tokenManager.setAccessToken(data.accessToken, data.expiresIn);
-
-      if (data.userInfo) {
-        localStorage.setItem('agentforge_user_info', JSON.stringify(data.userInfo));
-      }
-      if (data.permissions) {
-        localStorage.setItem('agentforge_permissions', JSON.stringify(data.permissions));
-      }
 
       const userInfo = data.userInfo || {};
       const user = mapUserDtoToUser({
@@ -344,11 +356,16 @@ export async function handleLoginApi(usernameVal: string, passwordVal: string): 
 
       state.isLoggedIn = true;
       state.currentUser = user;
+      
+      const { router } = await import('../router');
+      const redirectQuery = router.currentRoute.value.query.redirect as string;
+      
       if (data.mustResetPassword) {
         state.mustResetPasswordModalOpen = true;
       } else {
-        state.route = 'dashboard';
+        router.push(redirectQuery || '/dashboard');
       }
+      
       addToast({ type: 'success', title: '登录成功', message: `欢迎回来，${user.displayName || user.username}` });
       
       // Load all backend resources asynchronously
@@ -367,11 +384,15 @@ export async function handleLoginApi(usernameVal: string, passwordVal: string): 
 export function login(user: User) {
   state.isLoggedIn = true;
   state.currentUser = user;
-  if (user.mustResetPassword) {
-    state.mustResetPasswordModalOpen = true;
-  } else {
-    state.route = 'dashboard';
-  }
+  
+  import('../router').then(({ router }) => {
+    if (user.mustResetPassword) {
+      state.mustResetPasswordModalOpen = true;
+    } else {
+      router.push('/dashboard');
+    }
+  });
+
   addToast({ type: 'success', title: '登录成功', message: `欢迎回来，${user.displayName}` });
   fetchAllData();
 }
@@ -387,6 +408,11 @@ export async function logout() {
     state.isLoggedIn = false;
     state.currentUser = null;
     state.route = 'login';
+
+    const { router } = await import('../router');
+    if (router.currentRoute.value.path !== '/login') {
+      router.push('/login');
+    }
   }
 }
 
@@ -402,7 +428,10 @@ export async function completePasswordReset(newPassword = 'NewPassword123') {
     if (found) found.mustResetPassword = false;
   }
   state.mustResetPasswordModalOpen = false;
-  state.route = 'dashboard';
+
+  const { router } = await import('../router');
+  router.push('/dashboard');
+  
   addToast({ type: 'success', title: '密码初始化成功', message: '已安全开启平台操控权限' });
 }
 

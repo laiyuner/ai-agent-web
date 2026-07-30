@@ -19,8 +19,8 @@ const request = axios.create({
   withCredentials: true,
 });
 
-// Access Token Memory & Storage Manager
-let memoryAccessToken: string | null = localStorage.getItem('agentforge_access_token');
+// Pure In-Memory Access Token Manager
+let memoryAccessToken: string | null = null;
 let tokenExpiryTime: number = 0;
 let refreshPromise: Promise<string> | null = null;
 
@@ -30,15 +30,10 @@ export const tokenManager = {
     if (expiresIn) {
       tokenExpiryTime = Date.now() + expiresIn * 1000;
     }
-    if (token) {
-      localStorage.setItem('agentforge_access_token', token);
-    } else {
-      localStorage.removeItem('agentforge_access_token');
-    }
   },
 
   getAccessToken(): string | null {
-    return memoryAccessToken || localStorage.getItem('agentforge_access_token');
+    return memoryAccessToken;
   },
 
   isAccessTokenExpired(): boolean {
@@ -51,13 +46,10 @@ export const tokenManager = {
   clear() {
     memoryAccessToken = null;
     tokenExpiryTime = 0;
-    localStorage.removeItem('agentforge_access_token');
-    localStorage.removeItem('agentforge_user_info');
-    localStorage.removeItem('agentforge_permissions');
   },
 
   /**
-   * Automatically refresh access token using httpOnly cookie (handled by browser)
+   * Automatically refresh access token using httpOnly cookie / session refresh route
    */
   async refresh(): Promise<string> {
     if (refreshPromise) {
@@ -77,12 +69,6 @@ async function doRefresh(): Promise<string> {
   const data = resp.data?.data || resp.data;
   if (data && data.accessToken) {
     tokenManager.setAccessToken(data.accessToken, data.expiresIn);
-    if (data.userInfo) {
-      localStorage.setItem('agentforge_user_info', JSON.stringify(data.userInfo));
-    }
-    if (data.permissions) {
-      localStorage.setItem('agentforge_permissions', JSON.stringify(data.permissions));
-    }
     return data.accessToken;
   }
   throw new Error('刷新 Token 失败');
