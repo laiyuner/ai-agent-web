@@ -15,7 +15,7 @@ import P16_RoleManagement from '../components/pages/P16_RoleManagement.vue';
 import P17_Profile from '../components/pages/P17_Profile.vue';
 
 import { tokenManager } from '../api';
-import { state, refreshRouteData, fetchAllData, initUserFromSession } from '../stores/useAppStore';
+import { state, refreshRouteData, fetchAllData, initUserFromSession, setRouterInstance } from '../stores/useAppStore';
 import { PageRoute } from '../types';
 
 const routes: Array<RouteRecordRaw> = [
@@ -54,6 +54,8 @@ export const router = createRouter({
   history: createWebHistory(),
   routes,
 });
+
+setRouterInstance(router);
 
 // 路由与 PageRoute 映射表
 export const routeNameToPageRoute: Record<string, PageRoute> = {

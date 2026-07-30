@@ -8,7 +8,7 @@
       <Sidebar v-if="state.route !== 'workflow-edit'" />
 
       <main class="flex-1 overflow-y-auto bg-slate-100/80">
-        <router-view />
+        <router-view :key="$route.fullPath" />
       </main>
     </div>
 

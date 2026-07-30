@@ -330,14 +330,43 @@ export async function refreshRouteData(r: PageRoute) {
   }
 }
 
+export const pageRouteToPathMap: Record<PageRoute, string> = {
+  dashboard: '/dashboard',
+  workflows: '/workflows',
+  'workflow-edit': '/workflows/editor',
+  'workflow-monitor': '/execution-monitor',
+  agents: '/agents',
+  'mcp-servers': '/mcp-servers',
+  'llm-providers': '/llm-providers',
+  runs: '/execution-history',
+  'run-detail': '/execution-detail',
+  users: '/users',
+  roles: '/roles',
+  profile: '/profile',
+  login: '/login',
+};
+
+let routerInstance: any = null;
+
+export function setRouterInstance(router: any) {
+  routerInstance = router;
+}
+
 export function setRoute(r: PageRoute) {
-  state.route = r;
-  import('../router').then(({ router, pageRouteToPath }) => {
-    const targetPath = pageRouteToPath[r] || '/dashboard';
-    if (router.currentRoute.value.path !== targetPath) {
-      router.push(targetPath);
-    }
-  });
+  let targetPath = pageRouteToPathMap[r] || '/dashboard';
+  if (r === 'workflow-edit' && state.selectedWorkflowId) {
+    targetPath = `/workflows/editor/${state.selectedWorkflowId}`;
+  } else if (r === 'run-detail' && state.selectedRunId) {
+    targetPath = `/execution-detail/${state.selectedRunId}`;
+  }
+
+  if (routerInstance) {
+    routerInstance.push(targetPath).catch(() => {});
+  } else {
+    import('../router').then(({ router }) => {
+      router.push(targetPath).catch(() => {});
+    });
+  }
 }
 
 // Auth Methods
