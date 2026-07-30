@@ -17,10 +17,12 @@
         </main>
       </div>
 
-      <!-- Modals and Toast Notifications -->
+      <!-- Modals -->
       <ChangePasswordModal />
-      <Toast />
     </div>
+
+    <!-- Global Toast Notifications -->
+    <Toast />
   </div>
 </template>
 
