@@ -163,14 +163,14 @@
                 <span
                   class="text-xs px-2.5 py-0.5 rounded-full font-bold"
                   :class="
-                    run.status === 'running'
+                    (run.status || '').toLowerCase() === 'running'
                       ? 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
-                      : run.status === 'success'
+                      : (run.status || '').toLowerCase() === 'success'
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-rose-50 text-rose-700 border border-rose-200'
                   "
                 >
-                  {{ run.status === 'running' ? '推流中' : run.status === 'success' ? '完成' : '异常终止' }}
+                  {{ (run.status || '').toLowerCase() === 'running' ? '推流中' : (run.status || '').toLowerCase() === 'success' ? '完成' : '异常终止' }}
                 </span>
               </div>
               <div class="flex items-center justify-between text-xs text-slate-500 font-mono">
@@ -277,7 +277,7 @@ const statCards = computed(() => [
   },
   {
     title: '实时推流任务 (Running)',
-    value: state.runs.filter((r) => r.status === 'running').length.toString(),
+    value: state.runs.filter((r) => (r.status || '').toLowerCase() === 'running').length.toString(),
     subText: 'WebSocket 挂载实时追踪',
     subIcon: Activity,
     subColor: 'text-amber-500',

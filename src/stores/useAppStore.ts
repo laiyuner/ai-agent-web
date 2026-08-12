@@ -897,10 +897,30 @@ export async function stopRun(runId: string) {
   } catch (err: any) {
     console.warn('后端终止 API 无响应，强行中止:', err.message);
   }
-  const run = state.runs.find((r) => r.id === runId);
+  const run = state.runs.find((r) => String(r.id) === String(runId));
   if (run) {
     run.status = 'terminated';
     addToast({ type: 'warning', title: '终止指令已下发', message: `已打断并强行终止 Run #${runId}` });
+  }
+}
+
+export function updateRunInStore(
+  runId: string | number,
+  status: string,
+  durationMs?: number,
+  tokensUsed?: number
+) {
+  const targetId = String(runId);
+  const normStatus = status.toLowerCase();
+  const run = state.runs.find((r) => String(r.id) === targetId);
+  if (run) {
+    run.status = normStatus as any;
+    if (durationMs !== undefined && durationMs > 0) {
+      run.durationMs = durationMs;
+    }
+    if (tokensUsed !== undefined && tokensUsed > 0) {
+      run.tokensUsed = tokensUsed;
+    }
   }
 }
 
@@ -1327,6 +1347,7 @@ export function useAppStore() {
     validateWorkflow,
     triggerRun,
     stopRun,
+    updateRunInStore,
     addAgent,
     updateAgent,
     deleteAgent,

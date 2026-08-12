@@ -47,22 +47,32 @@ AgentForge 是一个基于 Vue 3、TypeScript 和 Tailwind CSS 构建的高性�
 
 ## ⚡ 性能优化与架构设计
 
-1. **DAG 画布帧率平滑 (RAF 拖拽节流)**
+详细技术文档与架构拆解请参阅 [OPTIMIZATION.md](./OPTIMIZATION.md)。
+
+1. **运行历史到推流监控无感平滑切换 (零卡顿 / 消除白屏)**
+   - **优化场景**：从运行历史审计页（`P13_ExecutionHistory.vue`）跳转至实时推流监控页（`P07_ExecutionMonitor.vue`）。
+   - **实现策略**：挂载阶段优先同步读取 AppStore 本地单据树实现首帧瞬间渲染，彻底消除网络请求等待导致的空白页；配合后台无缝数据补全与离屏骨架屏，获得秒级平滑过渡体验。
+
+2. **实时推流完成与全站状态响应式同步 (侧边栏 & 顶栏指示器)**
+   - **优化场景**：推流运行完成、失败或用户主动终止时的状态对齐。
+   - **实现策略**：在 Store 中新增 `updateRunInStore` 原子更新方法，结合不区分大小写的状态计算逻辑，使推流结束瞬间左侧导航栏 `推流中` 高亮徽章即刻消失，顶部 Header 推流指示器同步归零。
+
+3. **DAG 画布帧率平滑 (RAF 拖拽节流)**
    - **优化场景**：工作流编辑器 (`P06_WorkflowEditor.vue`) 中的节点拖拽与动态 SVG 贝塞尔曲线重绘。
    - **实现策略**：引入 `requestAnimationFrame` 锁机制对高频 `mousemove` 坐标更新进行帧率平滑限制，确保拖拽响应锁定在 60fps/120fps 原生刷新率，消除连续 Layout/Reflow 导致的画面 Jank。
 
-2. **流式 Token 与高频终端日志渲染**
+4. **流式 Token 与高频终端日志渲染**
    - **优化场景**：执行监控与调试页 (`P07_ExecutionMonitor.vue`) 高频 SSE/WebSocket 实时推流。
    - **实现策略**：采用 RAF 批量合并滚动计算与 DOM 更新，避免频繁触发 `scrollTop` 计算；内置 1000 条内存日志环形保护 (Ring Buffer)，防止长时运行内存溢出。
 
-3. **Vite 细粒度 Code Splitting (代码分割)**
+5. **Vite 细粒度 Code Splitting (代码分割)**
    - **优化场景**：首屏加载性能与静态资源缓存利用率。
    - **实现策略**：在 `vite.config.ts` 配置 Rollup `manualChunks` 策略：
      - `vue-vendor`: 独立拆分 `vue` / `vue-router` 框架核心库。
      - `icons`: 独立打包 `lucide-vue-next` 大型矢量图标库。
      - `vendor`: 其余第三方依赖分包，提升浏览器 HTTP 长期缓存命中率。
 
-4. **全局 UI/UX 手感规范**
+6. **全局 UI/UX 手感规范**
    - 全局注入可点击元素（`<button>`, `<a>`, `<select>`, `[role="button"]`）的 `cursor: pointer` 强约束，与 `disabled` 状态下的 `cursor: not-allowed` 统一触感。
 
 ---

@@ -99,7 +99,7 @@ const allMenuGroups = computed(() => [
         route: 'workflow-monitor' as PageRoute,
         label: '实时推流监控',
         icon: Activity,
-        badge: state.runs.filter((r) => r.status === 'running').length ? '推流中' : undefined,
+        badge: state.runs.filter((r) => (r.status || '').toLowerCase() === 'running').length ? '推流中' : undefined,
       },
       { route: 'runs' as PageRoute, label: '运行历史审计', icon: History, badge: state.runs.length.toString() },
     ],

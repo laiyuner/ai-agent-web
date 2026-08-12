@@ -1,5 +1,17 @@
 <template>
-  <div v-if="!currentRun" class="p-6 lg:p-8 w-full">
+  <div v-if="!currentRun && isFetchingRun" class="p-6 lg:p-8 w-full">
+    <div class="py-16 px-6 bg-white border border-slate-200/90 rounded-3xl text-center space-y-4 animate-pulse">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
+        <Activity class="w-6 h-6 animate-spin" />
+      </div>
+      <div class="space-y-1">
+        <h3 class="font-bold text-slate-800 text-sm sm:text-base">正在拉取调度审计详情...</h3>
+        <p class="text-xs text-slate-400">同步服务端运行单据与链路分片事件</p>
+      </div>
+    </div>
+  </div>
+
+  <div v-else-if="!currentRun && !isFetchingRun" class="p-6 lg:p-8 w-full">
     <div class="py-16 px-6 bg-white border-2 border-dashed border-slate-200 rounded-3xl text-center space-y-3">
       <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
         <Activity class="w-6 h-6" />
@@ -495,7 +507,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { api, tokenManager, mapRunDtoToRunRecord } from '../../api';
 import { WebSocketEvent } from '../../types';
 
-const { state, setRoute, stopRun } = useAppStore();
+const { state, setRoute, stopRun, updateRunInStore } = useAppStore();
 
 // UI States for Expansion & Modal
 const isInputExpanded = ref(false);
@@ -514,6 +526,7 @@ const modalContent = ref('');
 
 // Current Run record from Backend API or Store
 const currentRun = ref<any>(null);
+const isFetchingRun = ref(false);
 
 // WebSocket Status state
 const ws = ref<WebSocket | null>(null);
@@ -850,6 +863,8 @@ async function handleStopRun() {
   } catch (err) {
     stopRun(currentRun.value.id);
   }
+  currentRun.value.status = 'TERMINATED';
+  updateRunInStore(currentRun.value.id, 'TERMINATED');
 }
 
 function connectWebSocket(runId: number | string, token: string) {
@@ -945,6 +960,7 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       if (!isAlreadyFinished) {
         currentRun.value.status = 'RUNNING';
         runFinished.value = false;
+        updateRunInStore(currentRun.value.id, 'RUNNING');
       }
       addLog('info', `工作流开始执行`, data.timestamp);
       break;
@@ -1052,6 +1068,13 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       }
       runFinished.value = true;
       wsStatus.value = '已完成';
+
+      updateRunInStore(
+        currentRun.value.id,
+        currentRun.value.status,
+        currentRun.value.durationMs,
+        totalTokensUsed.value
+      );
 
       addLog(
         isSuccess ? 'info' : 'error',
@@ -1204,9 +1227,27 @@ function loadHistoryData() {
 // Initialization Lifecycle
 onMounted(async () => {
   const runId = state.selectedRunId || (state.runs[0] ? state.runs[0].id : null);
-  if (!runId) return;
+  if (!runId) {
+    isFetchingRun.value = false;
+    return;
+  }
 
-  // 1. Fetch run detail from Backend API
+  // 1. 同步尝试从 AppStore 全局状态直接读取（消除白屏与卡顿感）
+  const localFound = state.runs.find((r) => String(r.id) === String(runId));
+  if (localFound) {
+    currentRun.value = { ...localFound };
+    isFetchingRun.value = false;
+    if (nodeList.value.length > 0 && !selectedNodeKey.value) {
+      selectedNodeKey.value = nodeList.value[0].nodeKey;
+    }
+    if ((currentRun.value.status || '').toUpperCase() !== 'RUNNING') {
+      loadHistoryData();
+    }
+  } else {
+    isFetchingRun.value = true;
+  }
+
+  // 2. 异步请求后端 API 获取完整单据与 nodeRuns 链路明细
   try {
     const rawData = await api.getRun(runId);
     if (rawData) {
@@ -1215,13 +1256,12 @@ onMounted(async () => {
         mapped.nodeRuns = rawData.nodeRuns;
       }
       currentRun.value = mapped;
+      updateRunInStore(mapped.id, mapped.status, mapped.durationMs, mapped.tokensUsed);
     }
   } catch (err) {
-    console.warn('后端获取执行单据失败，读取本地状态', err);
-    const found = state.runs.find((r) => String(r.id) === String(runId));
-    if (found) {
-      currentRun.value = { ...found };
-    }
+    console.warn('后端获取执行单据失败，使用本地状态:', err);
+  } finally {
+    isFetchingRun.value = false;
   }
 
   if (!currentRun.value) {
@@ -1230,11 +1270,11 @@ onMounted(async () => {
   }
 
   // Initialize node states map & select first node
-  if (nodeList.value.length > 0) {
+  if (nodeList.value.length > 0 && !selectedNodeKey.value) {
     selectedNodeKey.value = nodeList.value[0].nodeKey;
   }
 
-  // 2. Decide behavior according to run status
+  // 3. Decide behavior according to run status
   const currentStatus = (currentRun.value.status || '').toUpperCase();
   if (currentStatus === 'RUNNING') {
     // 运行中：重置序号缓存并建立 WebSocket 实时连接
@@ -1249,6 +1289,7 @@ onMounted(async () => {
     // 已结束 (SUCCESS / FAILED / TERMINATED / PENDING etc.)：不建立 WebSocket
     wsStatus.value = '已结束';
     loadHistoryData();
+    updateRunInStore(currentRun.value.id, currentStatus, currentRun.value.durationMs, currentRun.value.tokensUsed);
   }
 });
 

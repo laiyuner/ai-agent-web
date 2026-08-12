@@ -236,7 +236,7 @@ const showDropdown = ref(false);
 const showScaleDropdown = ref(false);
 
 const runningCount = computed(() => {
-  return state.runs.filter((r) => r.status === 'running').length;
+  return state.runs.filter((r) => (r.status || '').toLowerCase() === 'running').length;
 });
 
 const displayModeLabel = computed(() => {
