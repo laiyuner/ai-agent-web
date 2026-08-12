@@ -10,6 +10,7 @@ import {
   PageRoute,
   ToastMessage,
   AgentType,
+  RoleType,
 } from '../types';
 import {
   api,
@@ -619,6 +620,72 @@ async function initAuthSession() {
 initAuthSession();
 
 // Helper functions for node/edge payload conversion
+export function hasRole(roles: RoleType | RoleType[]): boolean {
+  if (!state.currentUser) return false;
+  const userRole = state.currentUser.role || 'VIEWER';
+  if (Array.isArray(roles)) {
+    return roles.includes(userRole);
+  }
+  return userRole === roles;
+}
+
+export function canWrite(): boolean {
+  if (!state.currentUser) return false;
+  const role = state.currentUser.role || 'VIEWER';
+  return role === 'ADMIN' || role === 'DEVELOPER';
+}
+
+export function canManageUsers(): boolean {
+  if (!state.currentUser) return false;
+  return state.currentUser.role === 'ADMIN';
+}
+
+export function checkPermissionAndNotify(action: 'write' | 'admin' = 'write'): boolean {
+  if (action === 'admin') {
+    if (!canManageUsers()) {
+      addToast({
+        type: 'warning',
+        title: '权限不足',
+        message: '账号与角色权限矩阵管理仅限系统超级管理员（ADMIN）操作',
+      });
+      return false;
+    }
+    return true;
+  }
+
+  if (!canWrite()) {
+    addToast({
+      type: 'warning',
+      title: '权限不足',
+      message: '访客角色（VIEWER）仅拥有只读审计权限，无法执行新建、编辑或删除操作',
+    });
+    return false;
+  }
+  return true;
+}
+
+export function switchRoleForTesting(newRole: RoleType) {
+  if (!state.currentUser) {
+    state.currentUser = {
+      id: 'mock-user',
+      username: 'guest',
+      displayName: '审计访客',
+      email: 'guest@agentforge.internal',
+      role: newRole,
+      status: 'active',
+      createdAt: '2026-01-01',
+      lastLogin: '刚刚',
+    };
+  } else {
+    state.currentUser.role = newRole;
+  }
+  addToast({
+    type: 'info',
+    title: '角色身份已调整',
+    message: `已将当前会话模拟角色切换为：${newRole}`,
+  });
+}
+
 function convertNodeToReq(n: any) {
   let nodeType = 'AGENT';
   if (n.type === 'startNode') nodeType = 'START';
@@ -668,6 +735,7 @@ export async function fetchWorkflowDetail(id: string): Promise<Workflow | null> 
 
 // Workflow Operations
 export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'author'>) {
+  if (!checkPermissionAndNotify('write')) return null;
   try {
     const reqData = {
       name: wf.name,
@@ -697,6 +765,7 @@ export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'autho
 }
 
 export async function updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | null> {
+  if (!checkPermissionAndNotify('write')) return null;
   try {
     const wf = state.workflows.find((w) => w.id === id);
     const merged = { ...wf, ...updates } as Workflow;
@@ -731,6 +800,7 @@ export async function updateWorkflow(id: string, updates: Partial<Workflow>): Pr
 }
 
 export async function deleteWorkflow(id: string) {
+  if (!checkPermissionAndNotify('write')) return;
   try {
     await api.deleteWorkflow(id);
     addToast({ type: 'success', title: '移除完成', message: `工作流已从数据库成功删除` });
@@ -805,6 +875,7 @@ export async function validateWorkflow(wf: Workflow) {
 }
 
 export async function triggerRun(workflowId: string, inputMsg: string) {
+  if (!checkPermissionAndNotify('write')) throw new Error('访客（VIEWER）角色仅拥有只读权限，无法提交工作流调度');
   try {
     const runDto = await api.triggerRun(workflowId, inputMsg);
     const newRun = mapRunDtoToRunRecord(runDto);
@@ -1096,6 +1167,7 @@ export async function testLlmProvider(id: string) {
 
 // User Management
 export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'lastLogin'>) {
+  if (!checkPermissionAndNotify('admin')) return;
   try {
     const dto = await api.createUser({
       username: user.username,
@@ -1221,6 +1293,11 @@ if (typeof window !== 'undefined') {
 export function useAppStore() {
   return {
     state,
+    hasRole,
+    canWrite,
+    canManageUsers,
+    checkPermissionAndNotify,
+    switchRoleForTesting,
     addToast,
     removeToast,
     setRoute,

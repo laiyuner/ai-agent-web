@@ -151,7 +151,7 @@
           <div class="p-2.5 bg-slate-50 rounded-xl space-y-1">
             <div class="font-bold text-slate-900 text-sm">{{ state.currentUser?.displayName }}</div>
             <div class="text-xs text-slate-500 font-mono">{{ state.currentUser?.email }}</div>
-            <div class="pt-1">
+            <div class="pt-1 flex items-center justify-between">
               <span
                 class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full"
                 :class="
@@ -170,6 +170,36 @@
                     : '审计访客'
                 }}
               </span>
+            </div>
+          </div>
+
+          <!-- Quick Role Switcher for RBAC Testing -->
+          <div class="pt-2 border-t border-slate-100">
+            <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              角色权限测试切换 (RBAC)
+            </div>
+            <div class="grid grid-cols-3 gap-1 mt-1">
+              <button
+                @click="switchRoleForTesting('ADMIN')"
+                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                :class="state.currentUser?.role === 'ADMIN' ? 'bg-rose-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              >
+                管理员
+              </button>
+              <button
+                @click="switchRoleForTesting('DEVELOPER')"
+                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                :class="state.currentUser?.role === 'DEVELOPER' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              >
+                开发者
+              </button>
+              <button
+                @click="switchRoleForTesting('VIEWER')"
+                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                :class="state.currentUser?.role === 'VIEWER' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              >
+                访客(只读)
+              </button>
             </div>
           </div>
 
@@ -201,7 +231,7 @@ import { ref, computed } from 'vue';
 import { Plus, ChevronDown, User as UserIcon, LogOut, Monitor, Check } from 'lucide-vue-next';
 import { useAppStore, DisplayMode } from '../../stores/useAppStore';
 
-const { state, setRoute, setDisplayMode, logout } = useAppStore();
+const { state, setRoute, setDisplayMode, logout, switchRoleForTesting } = useAppStore();
 const showDropdown = ref(false);
 const showScaleDropdown = ref(false);
 

@@ -1,7 +1,7 @@
 <template>
   <aside class="w-60 border-r border-slate-200 bg-slate-50/70 flex flex-col justify-between shrink-0 select-none">
     <div class="p-3.5 space-y-6 overflow-y-auto">
-      <div v-for="group in menuGroups" :key="group.title" class="space-y-1.5">
+      <div v-for="group in visibleMenuGroups" :key="group.title" class="space-y-1.5">
         <div class="px-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
           {{ group.title }}
         </div>
@@ -10,7 +10,7 @@
             v-for="item in group.items"
             :key="item.route"
             @click="handleMenuClick(item.route)"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all group"
+            class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all group cursor-pointer"
             :class="
               state.route === item.route
                 ? 'bg-slate-900 text-white shadow-md'
@@ -67,9 +67,9 @@ import {
   ShieldCheck,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { PageRoute } from '../../types';
+import { PageRoute, RoleType } from '../../types';
 
-const { state, setRoute } = useAppStore();
+const { state, setRoute, canManageUsers } = useAppStore();
 
 function handleMenuClick(route: PageRoute) {
   if (route === 'workflow-edit') {
@@ -78,7 +78,7 @@ function handleMenuClick(route: PageRoute) {
   setRoute(route);
 }
 
-const menuGroups = computed(() => [
+const allMenuGroups = computed(() => [
   {
     title: '概览看板',
     items: [
@@ -114,10 +114,20 @@ const menuGroups = computed(() => [
   },
   {
     title: '平台管理 (RBAC)',
+    requiresAdmin: true,
     items: [
       { route: 'users' as PageRoute, label: '用户账号管理', icon: Users, badge: state.users.length.toString() },
       { route: 'roles' as PageRoute, label: '角色权限矩阵', icon: ShieldCheck },
     ],
   },
 ]);
+
+const visibleMenuGroups = computed(() => {
+  return allMenuGroups.value.filter((group) => {
+    if (group.requiresAdmin) {
+      return canManageUsers();
+    }
+    return true;
+  });
+});
 </script>

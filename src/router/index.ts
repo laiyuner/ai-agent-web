@@ -15,8 +15,8 @@ import P16_RoleManagement from '../components/pages/P16_RoleManagement.vue';
 import P17_Profile from '../components/pages/P17_Profile.vue';
 
 import { tokenManager } from '../api';
-import { state, refreshRouteData, fetchAllData, initUserFromSession, setRouterInstance } from '../stores/useAppStore';
-import { PageRoute } from '../types';
+import { state, refreshRouteData, fetchAllData, initUserFromSession, setRouterInstance, addToast } from '../stores/useAppStore';
+import { PageRoute, RoleType } from '../types';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -39,8 +39,8 @@ const routes: Array<RouteRecordRaw> = [
       { path: 'llm-providers', name: 'llm-providers', component: P12_LLMProviderList },
       { path: 'execution-history', name: 'runs', component: P13_ExecutionHistory },
       { path: 'execution-detail/:id?', name: 'run-detail', component: P14_ExecutionDetail },
-      { path: 'users', name: 'users', component: P15_UserManagement },
-      { path: 'roles', name: 'roles', component: P16_RoleManagement },
+      { path: 'users', name: 'users', component: P15_UserManagement, meta: { roles: ['ADMIN'] as RoleType[] } },
+      { path: 'roles', name: 'roles', component: P16_RoleManagement, meta: { roles: ['ADMIN'] as RoleType[] } },
       { path: 'profile', name: 'profile', component: P17_Profile },
     ],
   },
@@ -117,7 +117,7 @@ router.beforeEach(async (to, _from, next) => {
 
   const hasToken = !!tokenManager.getAccessToken();
 
-  // 2. 鉴权判断
+  // 2. 鉴权与 RBAC 权限判断
   if (!isPublic && !hasToken) {
     // 受保护路由但未认证 -> 跳转登录页
     next({ path: '/login', query: { redirect: to.fullPath } });
@@ -125,6 +125,20 @@ router.beforeEach(async (to, _from, next) => {
     // 已认证访问登录页 -> 跳转工作台
     next({ path: '/dashboard' });
   } else {
+    // 检查 RBAC 路由权限
+    const requiredRoles = to.meta.roles as RoleType[] | undefined;
+    if (requiredRoles && requiredRoles.length > 0) {
+      const userRole = state.currentUser?.role || 'VIEWER';
+      if (!requiredRoles.includes(userRole)) {
+        addToast({
+          type: 'warning',
+          title: '访问受限',
+          message: `您当前的角色 [${userRole}] 无权访问该管理模块，需要 [${requiredRoles.join(', ')}] 权限`,
+        });
+        next({ path: '/dashboard' });
+        return;
+      }
+    }
     next();
   }
 });

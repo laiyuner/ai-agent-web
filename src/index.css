@@ -36,4 +36,28 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   }
+
+  /* 全局统一鼠标手势规范 (Affordance & Usability) */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a,
+  select,
+  summary,
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  .clickable {
+    cursor: pointer !important;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  input:disabled,
+  select:disabled,
+  .disabled-item {
+    cursor: not-allowed !important;
+  }
 }
+
