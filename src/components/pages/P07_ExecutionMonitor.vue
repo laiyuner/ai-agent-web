@@ -827,13 +827,19 @@ function addLog(level: string, message: string, timestamp?: string) {
     message,
   });
 
-  if (autoScroll.value) {
-    nextTick(() => {
-      if (logContainer.value) {
-        logContainer.value.scrollTop = logContainer.value.scrollHeight;
-      }
-    });
-  }
+  scrollLogContainerToBottom();
+}
+
+let logScrollRaf: number | null = null;
+function scrollLogContainerToBottom() {
+  if (!autoScroll.value || !logContainer.value) return;
+  if (logScrollRaf !== null) return;
+  logScrollRaf = requestAnimationFrame(() => {
+    if (logContainer.value && autoScroll.value) {
+      logContainer.value.scrollTop = logContainer.value.scrollHeight;
+    }
+    logScrollRaf = null;
+  });
 }
 
 async function handleStopRun() {

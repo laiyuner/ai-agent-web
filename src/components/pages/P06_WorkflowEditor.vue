@@ -768,10 +768,11 @@ function getEdgePath(edge: any) {
   return `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
 }
 
-// Drag node handling
+// Drag node handling (Optimized with RAF throttling for 60fps smooth rendering)
 let draggingNode: DAGNode | null = null;
 let startX = 0;
 let startY = 0;
+let dragRafId: number | null = null;
 
 function startDragNode(e: MouseEvent, node: DAGNode) {
   draggingNode = node;
@@ -779,13 +780,23 @@ function startDragNode(e: MouseEvent, node: DAGNode) {
   startY = e.clientY - node.position.y;
 
   const onMouseMove = (ev: MouseEvent) => {
-    if (draggingNode) {
-      draggingNode.position.x = Math.max(20, ev.clientX - startX);
-      draggingNode.position.y = Math.max(20, ev.clientY - startY);
-    }
+    if (!draggingNode) return;
+    if (dragRafId !== null) return;
+
+    dragRafId = requestAnimationFrame(() => {
+      if (draggingNode) {
+        draggingNode.position.x = Math.max(20, ev.clientX - startX);
+        draggingNode.position.y = Math.max(20, ev.clientY - startY);
+      }
+      dragRafId = null;
+    });
   };
 
   const onMouseUp = () => {
+    if (dragRafId !== null) {
+      cancelAnimationFrame(dragRafId);
+      dragRafId = null;
+    }
     draggingNode = null;
     window.removeEventListener('mousemove', onMouseMove);
     window.removeEventListener('mouseup', onMouseUp);

@@ -11,6 +11,24 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('lucide-vue-next')) {
+                return 'icons';
+              }
+              if (id.includes('vue') || id.includes('vue-router')) {
+                return 'vue-vendor';
+              }
+              return 'vendor';
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 1000,
+    },
     server: {
       proxy: {
         '/api': {

@@ -39,6 +39,32 @@ AgentForge 是一个基于 Vue 3、TypeScript 和 Tailwind CSS 构建的高性�
 5. **系统监控与日志 (Analytics & Logs)**
    - Token 消耗统计、调用延迟监控与历史调用日志查看。
 
+6. **角色与权限控制 (RBAC 体系)**
+   - 细粒度支持 **超级管理员 (ADMIN)**、**开发者 (DEVELOPER)** 及 **审计访客 (VIEWER)** 角色。
+   - 路由前置守卫拦截、Store 写操作安全校验、菜单动态显隐与快捷角色测试面板。
+
+---
+
+## ⚡ 性能优化与架构设计
+
+1. **DAG 画布帧率平滑 (RAF 拖拽节流)**
+   - **优化场景**：工作流编辑器 (`P06_WorkflowEditor.vue`) 中的节点拖拽与动态 SVG 贝塞尔曲线重绘。
+   - **实现策略**：引入 `requestAnimationFrame` 锁机制对高频 `mousemove` 坐标更新进行帧率平滑限制，确保拖拽响应锁定在 60fps/120fps 原生刷新率，消除连续 Layout/Reflow 导致的画面 Jank。
+
+2. **流式 Token 与高频终端日志渲染**
+   - **优化场景**：执行监控与调试页 (`P07_ExecutionMonitor.vue`) 高频 SSE/WebSocket 实时推流。
+   - **实现策略**：采用 RAF 批量合并滚动计算与 DOM 更新，避免频繁触发 `scrollTop` 计算；内置 1000 条内存日志环形保护 (Ring Buffer)，防止长时运行内存溢出。
+
+3. **Vite 细粒度 Code Splitting (代码分割)**
+   - **优化场景**：首屏加载性能与静态资源缓存利用率。
+   - **实现策略**：在 `vite.config.ts` 配置 Rollup `manualChunks` 策略：
+     - `vue-vendor`: 独立拆分 `vue` / `vue-router` 框架核心库。
+     - `icons`: 独立打包 `lucide-vue-next` 大型矢量图标库。
+     - `vendor`: 其余第三方依赖分包，提升浏览器 HTTP 长期缓存命中率。
+
+4. **全局 UI/UX 手感规范**
+   - 全局注入可点击元素（`<button>`, `<a>`, `<select>`, `[role="button"]`）的 `cursor: pointer` 强约束，与 `disabled` 状态下的 `cursor: not-allowed` 统一触感。
+
 ---
 
 ## 🔒 认证架构 (v2.0 双令牌模型)
