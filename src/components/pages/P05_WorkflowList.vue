@@ -40,7 +40,7 @@
           v-for="f in filterOptions"
           :key="f.value"
           @click="statusFilter = f.value"
-          class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors"
+          class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
           :class="statusFilter === f.value ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'"
         >
           {{ f.label }}
@@ -229,8 +229,8 @@ const filteredWorkflows = computed(() => {
   });
 });
 
-function createNewWorkflow() {
-  const created = addWorkflow({
+async function createNewWorkflow() {
+  const created = await addWorkflow({
     name: '新建 API 自动化协作流',
     description: '通过拖拽 Agent 算子与 MCP 工具生成自动化调度规则',
     status: 'draft',
@@ -241,8 +241,10 @@ function createNewWorkflow() {
     ],
     edges: [{ id: 'e-1', source: 'node-start', target: 'node-end' }],
   });
-  state.selectedWorkflowId = created.id;
-  setRoute('workflow-edit');
+  if (created && created.id) {
+    state.selectedWorkflowId = created.id;
+    setRoute('workflow-edit');
+  }
 }
 
 function openEditor(id: string) {

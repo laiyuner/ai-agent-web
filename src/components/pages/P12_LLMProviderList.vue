@@ -1,12 +1,10 @@
 <template>
-  <div class="p-6 lg:p-8 w-full space-y-6 max-w-7xl mx-auto">
+  <div class="p-6 lg:p-8 w-full space-y-6">
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
-            <Cpu class="w-6 h-6" />
-          </div>
+          <Cpu class="w-6 h-6 text-indigo-600" />
           <span>LLM 大模型供应商与网关配置</span>
         </h2>
         <p class="text-xs sm:text-sm text-slate-500 mt-1">

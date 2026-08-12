@@ -14,7 +14,7 @@
 
       <button
         @click="openCreateDrawer"
-        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto"
+        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
         <Plus class="w-4 h-4" />
         <span>创建特化 Agent</span>
@@ -61,10 +61,10 @@
             </div>
 
             <div class="flex items-center gap-1">
-              <button @click="copyAgent(ag.id)" title="克隆 Agent" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+              <button @click="copyAgent(ag.id)" title="克隆 Agent" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer">
                 <Copy class="w-4 h-4" />
               </button>
-              <button @click="deleteAgent(ag.id)" title="移除" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+              <button @click="deleteAgent(ag.id)" title="移除" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -102,7 +102,7 @@
           <span class="text-xs text-slate-400 font-mono">创建人: {{ ag.creator }}</span>
           <button
             @click="openEditDrawer(ag)"
-            class="px-4 py-2 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-colors shadow-xs flex items-center gap-1.5"
+            class="px-4 py-2 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Sliders class="w-4 h-4" />
             <span>配置 Agent</span>

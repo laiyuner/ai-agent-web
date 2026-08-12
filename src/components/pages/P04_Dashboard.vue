@@ -25,7 +25,7 @@
         </button>
         <button
           @click="setRoute('agents')"
-          class="bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2"
+          class="bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer"
         >
           <Bot class="w-4 h-4 text-indigo-400" />
           <span>管理 Agent 智能体池</span>

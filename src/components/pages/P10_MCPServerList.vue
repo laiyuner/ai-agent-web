@@ -14,7 +14,7 @@
 
       <button
         @click="openCreateDrawer"
-        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto"
+        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
         <Plus class="w-4 h-4" />
         <span>注册新 MCP 服务器</span>
@@ -47,11 +47,11 @@
             </div>
 
             <div class="flex items-center gap-1">
-              <button @click="testMcpServer(mcp.id)" title="探针连通测试" class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors">
+              <button @click="testMcpServer(mcp.id)" title="探针连通测试" class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer">
                 <Activity class="w-4 h-4" />
               </button>
 
-              <button @click="deleteMcpServer(mcp.id)" title="移除" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+              <button @click="deleteMcpServer(mcp.id)" title="移除" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -93,7 +93,7 @@
           <span>更新于: {{ mcp.updatedAt }}</span>
           <button
             @click="openEditDrawer(mcp)"
-            class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-colors"
+            class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-colors cursor-pointer"
           >
             编辑参数
           </button>

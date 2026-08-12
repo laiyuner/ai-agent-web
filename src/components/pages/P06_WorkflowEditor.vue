@@ -476,7 +476,7 @@ import { useAppStore, addWorkflow, updateWorkflow, deleteWorkflow, addToast } fr
 import RunInputDialog from '../common/RunInputDialog.vue';
 import { DAGNode, Workflow as WorkflowType } from '../../types';
 
-const { state, setRoute } = useAppStore();
+const { state, setRoute, canWrite, checkPermissionAndNotify } = useAppStore();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -584,6 +584,10 @@ function togglePublishStatus() {
 
 async function saveCanvas() {
   if (!currentWf.value) return;
+  if (!canWrite()) {
+    checkPermissionAndNotify('write');
+    return;
+  }
 
   if (currentWf.value.status === 'published') {
     addToast({
