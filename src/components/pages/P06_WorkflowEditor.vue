@@ -268,7 +268,7 @@
               "
             >
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 min-w-0">
                   <div
                     class="w-3 h-3 rounded-full shrink-0"
                     :class="
@@ -283,7 +283,12 @@
                         : 'bg-indigo-500'
                     "
                   ></div>
-                  <span class="font-bold text-xs text-white truncate max-w-[150px]">{{ node.data.label }}</span>
+                  <span class="font-bold text-xs text-white truncate max-w-[130px]">{{ node.data.label }}</span>
+                  <span
+                    v-if="node.type === 'agentNode' && (node.data.systemPromptOverride || node.data.timeoutSeconds || Number.isFinite(node.data.retries))"
+                    class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-medium shrink-0 border border-amber-500/30"
+                    title="该节点已覆写 Agent 配置"
+                  >覆写</span>
                 </div>
                 <button
                   @click.stop="removeNode(node.id)"

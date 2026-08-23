@@ -274,7 +274,9 @@ export function mapWorkflowDtoToWorkflow(dto: any): Workflow {
       data: {
         label: n.name || n.label || n.nodeKey || '算子节点',
         agentId: n.agentId ? String(n.agentId) : undefined,
-        config: n.config || {},
+        systemPromptOverride: n.agentOverride?.systemPrompt || undefined,
+        timeoutSeconds: n.agentOverride?.timeoutMs ? Math.round(n.agentOverride.timeoutMs / 1000) : undefined,
+        retries: Number.isFinite(n.agentOverride?.retryCount) ? n.agentOverride.retryCount : undefined,
         nodeType: n.nodeType,
       },
     };

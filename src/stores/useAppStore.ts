@@ -702,10 +702,30 @@ function convertNodeToReq(n: any) {
     nodeType,
     name: n.data?.label || n.id,
     agentId,
+    agentOverride: buildAgentOverride(n.data),
     positionX: Math.round(n.position?.x || 0),
     positionY: Math.round(n.position?.y || 0),
-    config: n.data?.config || {},
   };
+}
+
+/**
+ * 从节点 data 构建节点级 Agent 配置覆盖对象（提交给后端 agent_override JSONB 列）。
+ * 只收集有值的键；全部为空时返回 null（后端按未覆写处理，行为与历史一致）。
+ * 单位换算：timeoutSeconds（秒）-> timeoutMs（毫秒）。
+ */
+function buildAgentOverride(data: any): Record<string, any> | null {
+  if (!data) return null;
+  const override: Record<string, any> = {};
+  if (typeof data.systemPromptOverride === 'string' && data.systemPromptOverride.trim()) {
+    override.systemPrompt = data.systemPromptOverride;
+  }
+  if (Number.isFinite(data.timeoutSeconds) && data.timeoutSeconds > 0) {
+    override.timeoutMs = Math.round(data.timeoutSeconds * 1000);
+  }
+  if (Number.isFinite(data.retries) && data.retries >= 0) {
+    override.retryCount = data.retries;
+  }
+  return Object.keys(override).length ? override : null;
 }
 
 function convertEdgeToReq(e: any) {
