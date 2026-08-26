@@ -67,6 +67,49 @@
 
 ---
 
+### 7. 🐛 DAG 画布节点级 Agent 覆写功能打通与持久化 (BUG-005)
+
+- **问题背景**：
+  在 DAG 工作流编辑器（`P06_WorkflowEditor.vue`）右侧抽屉中，选中 Agent 节点时支持配置三个“节点级覆写”参数：
+  1. 覆写 System Prompt（`systemPromptOverride`）
+  2. 超时阈值秒数（`timeoutSeconds`）
+  3. 重试次数（`retries`）
+  此前这些值仅存在前端临时响应式内存中。保存工作流时由于缺少映射字段被丢弃、页面刷新后重新加载为空、后端执行引擎运行时无法读取节点级配置，导致配置完全无法持久化与生效。
+- **优化与修复方案**：
+  1. **保存请求映射改造 (`useAppStore.ts -> convertNodeToReq`)**：
+     - 新增 `buildAgentOverride` 转换方法，组装 `agentOverride` 结构体：
+       - `systemPrompt`: 字符串非空时回传；
+       - `timeoutMs`: 将秒转换为毫秒存储（`Math.round(timeoutSeconds * 1000)`）；
+       - `retryCount`: 规范化重试次数；
+     - 采用“仅提交有效有值键”原则，无任何覆写时回传 `null`，与后端缺省回退全局 Agent 配置逻辑完全一致；
+     - 移除无用冗余的 `config` 字段。
+  2. **数据加载回填映射 (`api/index.ts -> mapWorkflowDtoToWorkflow`)**：
+     - 在接收后端工作流详情时，从 `agentOverride` 逆向解析数据并精确回填至节点 data：
+       - `systemPromptOverride = agentOverride?.systemPrompt`
+       - `timeoutSeconds = Math.round(agentOverride?.timeoutMs / 1000)`（毫秒逆向转为秒）
+       - `retries = agentOverride?.retryCount`
+     - 确保页面刷新、编辑工作流、导入/克隆工作流时覆写参数精准回显。
+  3. **画布节点 UI 状态增强 (`P06_WorkflowEditor.vue`)**：
+     - 在画布渲染 Agent 节点卡片顶部标签处，检测到存在覆写配置时自动展示琥珀色 `覆写` 高亮标签，提升用户在复杂工作流画布下的辨识度。
+
+---
+
+### 8. 🐛 WebSocket 连接地址去除硬编码 8080 端口与清理死代码 (BUG-006)
+
+- **问题背景**：
+  在执行监控与调试页面（`P07_ExecutionMonitor.vue`）中，WebSocket 实时推流连接地址原先硬编码为 `${protocol}//${hostname}:8080/ws/v1/runs/${runId}?token=...`：
+  1. **生产环境连接彻底阻断**：在生产部署环境中（如 `https://domain.com`），前端静态资源与 API 通过 Nginx 统一反向代理（80/443），后端 8080 端口不对公网开放且无独立 TLS 证书。浏览器在 HTTPS 页面中发起 `wss://domain:8080` 会因 Mixed Content、端口拦截或证书缺失导致连接失败，推流页面持续处于“连接中/已断开”状态，无法接收实时任务日志。
+  2. **无效的同步 try-catch 死代码**：原代码尝试用 `try { new WebSocket(...) } catch { fallback }` 处理降级，但 `new WebSocket()` 只在 URL 语法非法时抛出同步异常，网络不可达与连接失败属于异步事件，`catch` 分支永远无法触发，属于死代码。
+- **优化与修复方案**：
+  1. **同构 Host 动态路由**：
+     - 将 WebSocket 地址重构为 `${protocol}//${window.location.host}/ws/v1/runs/${runId}?token=${encodeURIComponent(token)}`。
+     - **本地开发**：通过 `ws://localhost:3000/ws/...` 发起，由 Vite 配置文件（`vite.config.ts`）中既有的 `/ws` proxy 规则自动转发至 `ws://localhost:8080`；
+     - **生产环境**：通过 `wss://domain.com/ws/...` 发起，由 Nginx 的 `location /ws` 配置反向代理至内网服务，无需暴露后端端口，解决 TLS / WSS 兼容性问题。
+  2. **清理冗余逻辑**：
+     - 移除无用的同步 `try...catch` 降级死代码，保持 WebSocket 连接与事件监听生命周期清晰健壮。
+
+---
+
 ## 🛠️ 性能测试与编译验证
 
 所有上述优化均已通过严苛的静态类型检查（`tsc --noEmit`）与 Vite 生产打包验证：
