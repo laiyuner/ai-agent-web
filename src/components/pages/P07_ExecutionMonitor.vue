@@ -870,18 +870,14 @@ async function handleStopRun() {
 function connectWebSocket(runId: number | string, token: string) {
   disconnect(); // Clear existing WS connection
 
+  // 地址跟随页面当前协议+域名+端口：本地走 Vite /ws 代理，生产走 Nginx /ws 反代，
+  // 不再直连后端 8080（生产 8080 不对公网开放且无 TLS，直连必然失败）
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const hostname = window.location.hostname;
-  const wsUrl = `${protocol}//${hostname}:8080/ws/v1/runs/${runId}?token=${encodeURIComponent(token)}`;
+  const wsUrl = `${protocol}//${window.location.host}/ws/v1/runs/${runId}?token=${encodeURIComponent(token)}`;
 
   wsStatus.value = '连接中...';
 
-  try {
-    ws.value = new WebSocket(wsUrl);
-  } catch (e) {
-    const fallbackUrl = `${protocol}//${window.location.host}/ws/v1/runs/${runId}?token=${encodeURIComponent(token)}`;
-    ws.value = new WebSocket(fallbackUrl);
-  }
+  ws.value = new WebSocket(wsUrl);
 
   ws.value.onopen = () => {
     wsStatus.value = '已连接';
