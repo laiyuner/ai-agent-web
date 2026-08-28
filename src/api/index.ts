@@ -8,6 +8,8 @@ import {
   RunRecord,
   Role,
   RoleType,
+  PermissionMatrixItem,
+  AgentMcpBinding,
 } from '../types';
 import { addToast } from '../stores/useAppStore';
 
@@ -221,7 +223,14 @@ export function mapUserDtoToUser(dto: any): User {
 
 export function mapAgentDtoToAgent(dto: any): Agent {
   const mcpServers = Array.isArray(dto.mcpServers) ? dto.mcpServers : [];
-  const boundTools = mcpServers.flatMap((m: any) => m.enabledTools || []);
+  // 权威绑定结构：保留 mcpServerId/Name 与 enabledTools 原始结构供编辑回显
+  const mcpBindings: AgentMcpBinding[] = mcpServers.map((m: any) => ({
+    mcpServerId: String(m.mcpServerId),
+    mcpServerName: m.mcpServerName || '',
+    enabledTools: Array.isArray(m.enabledTools) ? m.enabledTools : [],
+  }));
+  // 派生的扁平工具名列表（仅兼容旧展示点）
+  const boundTools = mcpBindings.flatMap((m) => m.enabledTools);
 
   const providerNames: Record<string, string> = {
     zhipu: '智谱 BigModel',
@@ -244,6 +253,7 @@ export function mapAgentDtoToAgent(dto: any): Agent {
     maxTokens: dto.llmParams?.max_tokens ?? 2000,
     systemPrompt: dto.systemPrompt || '',
     boundTools,
+    mcpBindings,
     timeout: Math.round((dto.timeoutMs || 60000) / 1000),
     maxRetries: dto.retryCount ?? 3,
     retryBackoffMs: dto.retryBackoffMs ?? 1000,
@@ -426,9 +436,46 @@ export function mapRoleDtoToRole(dto: any): Role {
     code: dto.name as RoleType,
     name: dto.name === 'ADMIN' ? '超级管理员' : dto.name === 'DEVELOPER' ? '开发者' : '审计访客',
     description: dto.description || '',
-    userCount: 0,
-    permissions: [],
+    userCount: typeof dto.userCount === 'number' ? dto.userCount : 0, // 后端已返回
+    permissions: [], // 由 fetchRoles 异步填充
   };
+}
+
+/**
+ * 将后端权限列表（含 resource/action 字段）聚合为前端矩阵展示结构。
+ * resource -> 模块行；action -> CRUD 列；非 CRUD 的 action 归入"特殊特权"。
+ */
+const RESOURCE_MODULE_NAMES: Record<string, string> = {
+  user: '用户管理',
+  role: '角色管理',
+  permission: '权限定义',
+  agent: 'Agent 智能体',
+  workflow: '工作流',
+  mcp_server: 'MCP 服务器',
+  llm_provider: 'LLM 供应商',
+  run: '执行历史',
+};
+
+export function aggregatePermissionsToMatrix(perms: any[]): PermissionMatrixItem[] {
+  const byResource = new Map<string, Set<string>>();
+  for (const p of perms) {
+    if (!byResource.has(p.resource)) byResource.set(p.resource, new Set());
+    byResource.get(p.resource)!.add(p.action);
+  }
+  const rows: PermissionMatrixItem[] = [];
+  for (const [resource, actions] of byResource) {
+    const special = [...actions].filter((a) => !['read', 'create', 'update', 'delete'].includes(a));
+    rows.push({
+      module: RESOURCE_MODULE_NAMES[resource] || resource,
+      moduleKey: resource,
+      read: actions.has('read'),
+      create: actions.has('create'),
+      update: actions.has('update'),
+      delete: actions.has('delete'),
+      special: special.length ? special.join(' / ') : undefined,
+    });
+  }
+  return rows;
 }
 
 // ==================== API Methods ====================
@@ -451,7 +498,7 @@ export const api = {
     }
   },
   changePassword: async (oldPassword: string, newPassword: string) => {
-    const res = await request.post('/auth/change-password', { oldPassword, newPassword });
+    const res = await request.put('/auth/me', { oldPassword, newPassword });
     return res.data?.data || res.data;
   },
   getMe: async () => {

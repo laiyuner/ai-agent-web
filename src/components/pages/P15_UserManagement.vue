@@ -13,6 +13,7 @@
       </div>
 
       <button
+        v-if="hasPermission('user:create')"
         @click="showCreateModal = true"
         class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
@@ -90,6 +91,7 @@
                 <div class="flex items-center justify-end gap-2">
                   <!-- Assign Role Button -->
                   <button
+                    v-if="hasPermission('user:update')"
                     @click="openAssignRoleModal(u)"
                     title="分配 RBAC 角色权限"
                     class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
@@ -99,6 +101,7 @@
                   </button>
 
                   <button
+                    v-if="hasPermission('user:reset_pwd')"
                     @click="resetUserPassword(u.id)"
                     title="强制重置初始密码"
                     class="p-1.5 rounded-xl text-amber-600 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors cursor-pointer"
@@ -106,7 +109,7 @@
                     <KeyRound class="w-4 h-4" />
                   </button>
                   <button
-                    v-if="u.id !== state.currentUser?.id"
+                    v-if="hasPermission('user:delete') && u.id !== state.currentUser?.id"
                     @click="deleteUser(u.id)"
                     title="注销该成员账号"
                     class="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
@@ -284,7 +287,7 @@ import { Users, UserPlus, KeyRound, Trash2, X, ShieldCheck, ShieldAlert, UserChe
 import { useAppStore } from '../../stores/useAppStore';
 import { RoleType, User } from '../../types';
 
-const { state, addUser, updateUser, resetUserPassword, deleteUser } = useAppStore();
+const { state, addUser, updateUser, resetUserPassword, deleteUser, hasPermission } = useAppStore();
 
 const showCreateModal = ref(false);
 const showRoleModal = ref(false);

@@ -13,6 +13,7 @@
       </div>
 
       <button
+        v-if="hasPermission('agent:create')"
         @click="openCreateDrawer"
         class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
@@ -61,10 +62,20 @@
             </div>
 
             <div class="flex items-center gap-1">
-              <button @click="copyAgent(ag.id)" title="克隆 Agent" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer">
+              <button
+                v-if="hasPermission('agent:clone')"
+                @click="copyAgent(ag.id)"
+                title="克隆 Agent"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
                 <Copy class="w-4 h-4" />
               </button>
-              <button @click="deleteAgent(ag.id)" title="移除" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+              <button
+                v-if="hasPermission('agent:delete')"
+                @click="deleteAgent(ag.id)"
+                title="移除"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -105,7 +116,7 @@
             class="px-4 py-2 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Sliders class="w-4 h-4" />
-            <span>配置 Agent</span>
+            <span>{{ hasPermission('agent:update') ? '配置 Agent' : '查看详情' }}</span>
           </button>
         </div>
       </div>
@@ -120,7 +131,11 @@
         <h3 class="font-bold text-slate-800 text-sm sm:text-base">暂无 Agent 智能体记录</h3>
         <p class="text-xs text-slate-500 max-w-sm mx-auto">当前资产池中无智能体配置，请点击右上角创建特化 Agent。</p>
       </div>
-      <button @click="openCreateDrawer" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+      <button
+        v-if="hasPermission('agent:create')"
+        @click="openCreateDrawer"
+        class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+      >
         <Plus class="w-3.5 h-3.5" />
         <span>创建特化 Agent</span>
       </button>
@@ -138,7 +153,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import P09_AgentDrawer from './P09_AgentDrawer.vue';
 import { Agent } from '../../types';
 
-const { state, copyAgent, deleteAgent, fetchAgents } = useAppStore();
+const { state, copyAgent, deleteAgent, fetchAgents, hasPermission } = useAppStore();
 
 const searchQuery = ref('');
 

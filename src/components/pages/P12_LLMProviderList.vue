@@ -15,6 +15,7 @@
       <!-- Right Actions: Add Provider Button -->
       <div class="flex items-center gap-3 shrink-0">
         <button
+          v-if="hasPermission('llm_provider:update')"
           @click="openAddModal"
           class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-2 shadow-sm cursor-pointer"
         >
@@ -104,6 +105,7 @@
 
             <!-- Test Connection Button (Matching global unified button style) -->
             <button
+              v-if="hasPermission('llm_provider:test')"
               @click="testLlmProvider(p.id)"
               title="测试 Endpoint 握手连通性与响应延时"
               class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs shrink-0 mt-0.5"
@@ -145,6 +147,7 @@
               
               <!-- Quick Add Model Link -->
               <button
+                v-if="hasPermission('llm_provider:update')"
                 @click="promptAddModel(p.id)"
                 class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer"
               >
@@ -203,6 +206,7 @@
             </div>
 
             <button
+              v-if="hasPermission('llm_provider:update')"
               @click="saveKey(p.id)"
               class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors shrink-0 shadow-2xs cursor-pointer"
             >
@@ -358,6 +362,7 @@ const {
   setDefaultModel,
   testLlmProvider,
   addToast,
+  hasPermission,
 } = useAppStore();
 
 const searchQuery = ref('');

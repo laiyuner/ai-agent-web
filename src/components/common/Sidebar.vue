@@ -67,9 +67,9 @@ import {
   ShieldCheck,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { PageRoute, RoleType } from '../../types';
+import { PageRoute } from '../../types';
 
-const { state, setRoute, canManageUsers } = useAppStore();
+const { state, setRoute, hasPermission, hasAnyPermission } = useAppStore();
 
 function handleMenuClick(route: PageRoute) {
   if (route === 'workflow-edit') {
@@ -114,7 +114,7 @@ const allMenuGroups = computed(() => [
   },
   {
     title: '平台管理 (RBAC)',
-    requiresAdmin: true,
+    requiresPermission: ['user:read', 'role:read'],
     items: [
       { route: 'users' as PageRoute, label: '用户账号管理', icon: Users, badge: state.users.length.toString() },
       { route: 'roles' as PageRoute, label: '角色权限矩阵', icon: ShieldCheck },
@@ -123,9 +123,9 @@ const allMenuGroups = computed(() => [
 ]);
 
 const visibleMenuGroups = computed(() => {
-  return allMenuGroups.value.filter((group) => {
-    if (group.requiresAdmin) {
-      return canManageUsers();
+  return allMenuGroups.value.filter((group: any) => {
+    if (group.requiresPermission) {
+      return hasAnyPermission(group.requiresPermission) || state.currentUser?.role === 'ADMIN';
     }
     return true;
   });

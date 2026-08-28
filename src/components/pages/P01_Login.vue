@@ -132,8 +132,8 @@ import { useAppStore } from '../../stores/useAppStore';
 
 const { handleLoginApi } = useAppStore();
 
-const username = ref('admin');
-const password = ref('admin123');
+const username = ref('');
+const password = ref('');
 const isLoading = ref(false);
 
 const features = [

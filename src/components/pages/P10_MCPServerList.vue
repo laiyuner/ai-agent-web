@@ -13,6 +13,7 @@
       </div>
 
       <button
+        v-if="hasPermission('mcp_server:create')"
         @click="openCreateDrawer"
         class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
@@ -47,11 +48,21 @@
             </div>
 
             <div class="flex items-center gap-1">
-              <button @click="testMcpServer(mcp.id)" title="探针连通测试" class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer">
+              <button
+                v-if="hasPermission('mcp_server:test')"
+                @click="testMcpServer(mcp.id)"
+                title="探针连通测试"
+                class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+              >
                 <Activity class="w-4 h-4" />
               </button>
 
-              <button @click="deleteMcpServer(mcp.id)" title="移除" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+              <button
+                v-if="hasPermission('mcp_server:delete')"
+                @click="deleteMcpServer(mcp.id)"
+                title="移除"
+                class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -95,7 +106,7 @@
             @click="openEditDrawer(mcp)"
             class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-colors cursor-pointer"
           >
-            编辑参数
+            {{ hasPermission('mcp_server:update') ? '编辑参数' : '查看参数' }}
           </button>
         </div>
       </div>
@@ -110,7 +121,11 @@
         <h3 class="font-bold text-slate-800 text-sm sm:text-base">暂无 MCP 服务器记录</h3>
         <p class="text-xs text-slate-500 max-w-sm mx-auto">尚未连接外部 Model Context Protocol 探针，点击下方进行新增注册。</p>
       </div>
-      <button @click="openCreateDrawer" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+      <button
+        v-if="hasPermission('mcp_server:create')"
+        @click="openCreateDrawer"
+        class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+      >
         <Plus class="w-3.5 h-3.5" />
         <span>注册新 MCP 服务器</span>
       </button>
@@ -126,7 +141,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import P11_MCPServerDrawer from './P11_MCPServerDrawer.vue';
 import { MCPServer } from '../../types';
 
-const { state, testMcpServer, deleteMcpServer } = useAppStore();
+const { state, testMcpServer, deleteMcpServer, hasPermission } = useAppStore();
 
 function openCreateDrawer() {
   state.editingMcp = null;

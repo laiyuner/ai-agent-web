@@ -110,6 +110,7 @@
 
       <!-- Quick Route Actions -->
       <button
+        v-if="hasPermission('workflow:create')"
         @click="openNewWorkflowCanvas"
         class="hidden sm:flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
       >
@@ -231,9 +232,61 @@ import { ref, computed } from 'vue';
 import { Plus, ChevronDown, User as UserIcon, LogOut, Monitor, Check } from 'lucide-vue-next';
 import { useAppStore, DisplayMode } from '../../stores/useAppStore';
 
-const { state, setRoute, setDisplayMode, logout, switchRoleForTesting } = useAppStore();
+const { state, setRoute, setDisplayMode, logout, addToast, hasPermission } = useAppStore();
 const showDropdown = ref(false);
 const showScaleDropdown = ref(false);
+
+function switchRoleForTesting(newRole: 'ADMIN' | 'DEVELOPER' | 'VIEWER') {
+  if (!state.currentUser) {
+    state.currentUser = {
+      id: 'mock-user',
+      username: 'guest',
+      displayName: '测试用户',
+      email: 'user@agentforge.internal',
+      role: newRole,
+      status: 'active',
+      createdAt: '2026-01-01',
+      lastLogin: '刚刚',
+    };
+  } else {
+    state.currentUser.role = newRole;
+  }
+
+  if (newRole === 'ADMIN') {
+    state.permissions = [
+      'workflow:read', 'workflow:create', 'workflow:update', 'workflow:delete', 'workflow:clone', 'workflow:execute',
+      'agent:read', 'agent:create', 'agent:update', 'agent:delete', 'agent:clone',
+      'mcp_server:read', 'mcp_server:create', 'mcp_server:update', 'mcp_server:delete', 'mcp_server:test',
+      'llm_provider:read', 'llm_provider:update', 'llm_provider:test',
+      'run:read', 'run:terminate',
+      'user:read', 'user:create', 'user:update', 'user:delete', 'user:reset_password',
+      'role:read',
+    ];
+  } else if (newRole === 'DEVELOPER') {
+    state.permissions = [
+      'workflow:read', 'workflow:create', 'workflow:update', 'workflow:clone', 'workflow:execute',
+      'agent:read', 'agent:create', 'agent:update', 'agent:clone',
+      'mcp_server:read', 'mcp_server:create', 'mcp_server:update', 'mcp_server:test',
+      'llm_provider:read',
+      'run:read', 'run:terminate',
+    ];
+  } else {
+    // VIEWER
+    state.permissions = [
+      'workflow:read',
+      'agent:read',
+      'mcp_server:read',
+      'llm_provider:read',
+      'run:read',
+    ];
+  }
+
+  addToast({
+    type: 'info',
+    title: '角色权限已切换',
+    message: `已切换为【${newRole}】，已同步权限码：${state.permissions.length} 项`,
+  });
+}
 
 const runningCount = computed(() => {
   return state.runs.filter((r) => (r.status || '').toLowerCase() === 'running').length;

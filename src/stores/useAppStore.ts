@@ -22,6 +22,7 @@ import {
   mapLlmDtoToLlm,
   mapRunDtoToRunRecord,
   mapRoleDtoToRole,
+  aggregatePermissionsToMatrix,
 } from '../api';
 
 // Initial Fallback Mock Data (Used if server is offline or newly booted)
@@ -198,6 +199,8 @@ const savedDisplayMode = ((typeof localStorage !== 'undefined' && localStorage.g
 export const state = reactive({
   isLoggedIn: false,
   currentUser: null as User | null,
+  /** 当前用户的权限码列表（后端 /auth/login 与 /auth/me 下发，权限判断唯一事实来源） */
+  permissions: [] as string[],
   mustResetPasswordModalOpen: false,
   route: 'login' as PageRoute,
 
@@ -252,6 +255,13 @@ export async function initUserFromSession() {
     if (meData) {
       state.currentUser = mapUserDtoToUser(meData);
       state.isLoggedIn = true;
+      // /auth/me 现已返回 permissions；刷新后权限状态不丢失
+      state.permissions = Array.isArray(meData.permissions) ? meData.permissions : [];
+      // 后端 /auth/me 现已返回 mustResetPassword；刷新恢复会话时若用户
+      // 仍处于待改密状态，必须重新弹出强制改密弹窗，防止 F5 绕过
+      if (meData.mustResetPassword || meData.status === 'PASSWORD_RESET') {
+        state.mustResetPasswordModalOpen = true;
+      }
       return;
     }
   } catch (err: any) {
@@ -386,14 +396,16 @@ export async function handleLoginApi(usernameVal: string, passwordVal: string): 
 
       state.isLoggedIn = true;
       state.currentUser = user;
+      state.permissions = Array.isArray(data.permissions) ? data.permissions : [];
       
       const { router } = await import('../router');
       const redirectQuery = router.currentRoute.value.query.redirect as string;
       
+      // 无论是否强制改密都进入业务页；mustResetPassword 时由全局
+      // ChangePasswordModal（App.vue 渲染）以全屏遮罩强制用户先完成改密
+      router.push(redirectQuery || '/dashboard');
       if (data.mustResetPassword) {
         state.mustResetPasswordModalOpen = true;
-      } else {
-        router.push(redirectQuery || '/dashboard');
       }
       
       addToast({ type: 'success', title: '登录成功', message: `欢迎回来，${user.displayName || user.username}` });
@@ -416,10 +428,9 @@ export function login(user: User) {
   state.currentUser = user;
   
   import('../router').then(({ router }) => {
+    router.push('/dashboard');
     if (user.mustResetPassword) {
       state.mustResetPasswordModalOpen = true;
-    } else {
-      router.push('/dashboard');
     }
   });
 
@@ -437,6 +448,7 @@ export async function logout() {
     tokenManager.clear();
     state.isLoggedIn = false;
     state.currentUser = null;
+    state.permissions = [];
     state.route = 'login';
 
     const { router } = await import('../router');
@@ -446,23 +458,40 @@ export async function logout() {
   }
 }
 
-export async function completePasswordReset(newPassword = 'NewPassword123') {
+/**
+ * 完成强制/主动密码重置。
+ *
+ * 行为约定（与后端契约对齐）：
+ * - 调用 PUT /auth/me 提交 { oldPassword, newPassword }；
+ * - 成功：关闭弹窗、清除当前用户的待改密标记、若不在业务页则跳转 /dashboard、
+ *   Toast 提示成功。不要求重新登录（改密时已通过旧密码验证身份，
+ *   且后端不撤销当前 token）；
+ * - 失败：抛出错误给调用方（弹窗展示 err.message 并保持打开），不关弹窗。
+ *
+ * @returns true=成功；false=失败（错误信息已由调用方展示）
+ */
+export async function completePasswordReset(oldPassword: string, newPassword: string): Promise<boolean> {
   try {
-    await api.changePassword('admin123', newPassword);
-  } catch {
-    // fallback
+    await api.changePassword(oldPassword, newPassword);
+  } catch (err: any) {
+    addToast({ type: 'error', title: '密码修改失败', message: err.message || '请检查旧密码与新密码是否符合要求' });
+    return false;
   }
+
   if (state.currentUser) {
     state.currentUser.mustResetPassword = false;
-    const found = state.users.find((u) => u.id === state.currentUser?.id);
-    if (found) found.mustResetPassword = false;
   }
   state.mustResetPasswordModalOpen = false;
 
+  // 兜底：若当前仍停在登录页（正常流程不会），跳转业务页
   const { router } = await import('../router');
-  router.push('/dashboard');
-  
-  addToast({ type: 'success', title: '密码初始化成功', message: '已安全开启平台操控权限' });
+  if (router.currentRoute.value.path === '/login') {
+    const redirectQuery = router.currentRoute.value.query.redirect as string;
+    router.push(redirectQuery || '/dashboard');
+  }
+
+  addToast({ type: 'success', title: '密码修改成功', message: '新密码已生效，欢迎进入 AgentForge 系统' });
+  return true;
 }
 
 // ==================== Data Syncing (Backend API Fetchers) ====================
@@ -549,7 +578,17 @@ export async function fetchRoles() {
   try {
     const items = await api.getRoles();
     const list = Array.isArray(items) ? items : (items?.items || []);
-    state.roles = list.map(mapRoleDtoToRole);
+    const roles = list.map(mapRoleDtoToRole);
+    // 并发拉取每个角色的权限码列表，聚合为矩阵结构
+    await Promise.all(roles.map(async (role) => {
+      try {
+        const perms = await api.getRolePermissions(role.id);
+        role.permissions = aggregatePermissionsToMatrix(Array.isArray(perms) ? perms : []);
+      } catch (err: any) {
+        console.warn(`获取角色 ${role.name} 权限失败:`, err.message);
+      }
+    }));
+    state.roles = roles;
   } catch (err: any) {
     state.roles = [];
     console.warn('后端获取角色失败:', err.message);
@@ -587,6 +626,7 @@ async function initAuthSession() {
     if (meData) {
       state.currentUser = mapUserDtoToUser(meData);
       state.isLoggedIn = true;
+      state.permissions = Array.isArray(meData.permissions) ? meData.permissions : [];
       fetchAllData();
       return;
     }
@@ -603,6 +643,7 @@ async function initAuthSession() {
       if (meData) {
         state.currentUser = mapUserDtoToUser(meData);
         state.isLoggedIn = true;
+        state.permissions = Array.isArray(meData.permissions) ? meData.permissions : [];
         fetchAllData();
         return;
       }
@@ -614,77 +655,26 @@ async function initAuthSession() {
   tokenManager.clear();
   state.isLoggedIn = false;
   state.currentUser = null;
+  state.permissions = [];
   state.route = 'login';
 }
 
 initAuthSession();
 
-// Helper functions for node/edge payload conversion
-export function hasRole(roles: RoleType | RoleType[]): boolean {
-  if (!state.currentUser) return false;
-  const userRole = state.currentUser.role || 'VIEWER';
-  if (Array.isArray(roles)) {
-    return roles.includes(userRole);
-  }
-  return userRole === roles;
-}
-
-export function canWrite(): boolean {
-  if (!state.currentUser) return false;
-  const role = state.currentUser.role || 'VIEWER';
-  return role === 'ADMIN' || role === 'DEVELOPER';
-}
-
-export function canManageUsers(): boolean {
-  if (!state.currentUser) return false;
-  return state.currentUser.role === 'ADMIN';
-}
-
-export function checkPermissionAndNotify(action: 'write' | 'admin' = 'write'): boolean {
-  if (action === 'admin') {
-    if (!canManageUsers()) {
-      addToast({
-        type: 'warning',
-        title: '权限不足',
-        message: '账号与角色权限矩阵管理仅限系统超级管理员（ADMIN）操作',
-      });
-      return false;
-    }
-    return true;
-  }
-
-  if (!canWrite()) {
-    addToast({
-      type: 'warning',
-      title: '权限不足',
-      message: '访客角色（VIEWER）仅拥有只读审计权限，无法执行新建、编辑或删除操作',
-    });
-    return false;
-  }
-  return true;
-}
-
-export function switchRoleForTesting(newRole: RoleType) {
-  if (!state.currentUser) {
-    state.currentUser = {
-      id: 'mock-user',
-      username: 'guest',
-      displayName: '审计访客',
-      email: 'guest@agentforge.internal',
-      role: newRole,
-      status: 'active',
-      createdAt: '2026-01-01',
-      lastLogin: '刚刚',
-    };
-  } else {
-    state.currentUser.role = newRole;
-  }
-  addToast({
-    type: 'info',
-    title: '角色身份已调整',
-    message: `已将当前会话模拟角色切换为：${newRole}`,
-  });
-}
+import {
+  hasRole,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  checkPermissionAndNotify,
+} from '../permission';
+export {
+  hasRole,
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+  checkPermissionAndNotify,
+};
 
 function convertNodeToReq(n: any) {
   let nodeType = 'AGENT';
@@ -755,7 +745,7 @@ export async function fetchWorkflowDetail(id: string): Promise<Workflow | null> 
 
 // Workflow Operations
 export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'author'>) {
-  if (!checkPermissionAndNotify('write')) return null;
+  if (!checkPermissionAndNotify('workflow:create')) return null;
   try {
     const reqData = {
       name: wf.name,
@@ -785,7 +775,7 @@ export async function addWorkflow(wf: Omit<Workflow, 'id' | 'updatedAt' | 'autho
 }
 
 export async function updateWorkflow(id: string, updates: Partial<Workflow>): Promise<Workflow | null> {
-  if (!checkPermissionAndNotify('write')) return null;
+  if (!checkPermissionAndNotify('workflow:update')) return null;
   try {
     const wf = state.workflows.find((w) => w.id === id);
     const merged = { ...wf, ...updates } as Workflow;
@@ -820,7 +810,7 @@ export async function updateWorkflow(id: string, updates: Partial<Workflow>): Pr
 }
 
 export async function deleteWorkflow(id: string) {
-  if (!checkPermissionAndNotify('write')) return;
+  if (!checkPermissionAndNotify('workflow:delete')) return;
   try {
     await api.deleteWorkflow(id);
     addToast({ type: 'success', title: '移除完成', message: `工作流已从数据库成功删除` });
@@ -835,6 +825,7 @@ export async function deleteWorkflow(id: string) {
 }
 
 export async function copyWorkflow(id: string) {
+  if (!checkPermissionAndNotify('workflow:clone')) return;
   try {
     const wf = state.workflows.find((w) => w.id === id);
     const name = `${wf?.name || '工作流'} (副本)`;
@@ -848,6 +839,7 @@ export async function copyWorkflow(id: string) {
 }
 
 export async function publishWorkflow(id: string) {
+  if (!checkPermissionAndNotify('workflow:update')) return;
   try {
     await api.publishWorkflow(id);
     const wf = state.workflows.find((w) => w.id === id);
@@ -859,6 +851,7 @@ export async function publishWorkflow(id: string) {
 }
 
 export async function unpublishWorkflow(id: string) {
+  if (!checkPermissionAndNotify('workflow:update')) return;
   try {
     await api.unpublishWorkflow(id);
     const wf = state.workflows.find((w) => w.id === id);
@@ -895,7 +888,7 @@ export async function validateWorkflow(wf: Workflow) {
 }
 
 export async function triggerRun(workflowId: string, inputMsg: string) {
-  if (!checkPermissionAndNotify('write')) throw new Error('访客（VIEWER）角色仅拥有只读权限，无法提交工作流调度');
+  if (!checkPermissionAndNotify('workflow:execute')) throw new Error('当前角色未授权该操作（需要权限：workflow:execute）');
   try {
     const runDto = await api.triggerRun(workflowId, inputMsg);
     const newRun = mapRunDtoToRunRecord(runDto);
@@ -912,6 +905,7 @@ export async function triggerRun(workflowId: string, inputMsg: string) {
 }
 
 export async function stopRun(runId: string) {
+  if (!checkPermissionAndNotify('run:terminate')) return;
   try {
     await api.terminateRun(runId);
   } catch (err: any) {
@@ -946,6 +940,7 @@ export function updateRunInStore(
 
 // Agent CRUD
 export async function addAgent(agent: Omit<Agent, 'id' | 'updatedAt' | 'creator'>) {
+  if (!checkPermissionAndNotify('agent:create')) return null;
   try {
     const reqData = {
       name: agent.name,
@@ -961,6 +956,11 @@ export async function addAgent(agent: Omit<Agent, 'id' | 'updatedAt' | 'creator'
       retryBackoffMs: agent.retryBackoffMs ?? 1000,
       timeoutMs: (agent.timeout || 60) * 1000,
       isPublic: !!agent.isPublic,
+      // MCP 绑定：始终提交（[] 表示不绑定任何 MCP），mcpServerId 转数字
+      mcpServers: (agent.mcpBindings || []).map((b) => ({
+        mcpServerId: Number(b.mcpServerId),
+        enabledTools: b.enabledTools || [],
+      })),
     };
     const dto = await api.createAgent(reqData);
     const newAgent = mapAgentDtoToAgent(dto);
@@ -981,6 +981,7 @@ export async function addAgent(agent: Omit<Agent, 'id' | 'updatedAt' | 'creator'
 }
 
 export async function updateAgent(id: string, updates: Partial<Agent>) {
+  if (!checkPermissionAndNotify('agent:update')) return;
   try {
     const reqData: any = {};
     if (updates.name !== undefined) reqData.name = updates.name;
@@ -994,6 +995,13 @@ export async function updateAgent(id: string, updates: Partial<Agent>) {
         temperature: updates.temperature ?? 0.7,
         max_tokens: updates.maxTokens ?? 2000,
       };
+    }
+    // MCP 绑定全量替换：编辑保存必须提交当前完整列表（含空数组），否则解绑不生效
+    if (updates.mcpBindings !== undefined) {
+      reqData.mcpServers = (updates.mcpBindings || []).map((b: any) => ({
+        mcpServerId: Number(b.mcpServerId),
+        enabledTools: b.enabledTools || [],
+      }));
     }
     const dto = await api.updateAgent(id, reqData);
     const updatedAgent = mapAgentDtoToAgent(dto);
@@ -1016,6 +1024,7 @@ export async function updateAgent(id: string, updates: Partial<Agent>) {
 }
 
 export async function deleteAgent(id: string) {
+  if (!checkPermissionAndNotify('agent:delete')) return;
   try {
     await api.deleteAgent(id);
   } catch (err: any) {
@@ -1027,6 +1036,7 @@ export async function deleteAgent(id: string) {
 }
 
 export async function copyAgent(id: string) {
+  if (!checkPermissionAndNotify('agent:clone')) return;
   try {
     const ag = state.agents.find((a) => a.id === id);
     const name = `${ag?.name || 'Agent'} (副本)`;
@@ -1041,6 +1051,7 @@ export async function copyAgent(id: string) {
 
 // MCP Server CRUD
 export async function addMcpServer(mcp: Omit<MCPServer, 'id' | 'updatedAt' | 'status' | 'toolsCount'>) {
+  if (!checkPermissionAndNotify('mcp_server:create')) return;
   try {
     const envVarsObj: Record<string, string> = {};
     (mcp.envVars || []).forEach((item) => {
@@ -1074,6 +1085,7 @@ export async function addMcpServer(mcp: Omit<MCPServer, 'id' | 'updatedAt' | 'st
 }
 
 export async function updateMcpServer(id: string, updates: Partial<MCPServer>) {
+  if (!checkPermissionAndNotify('mcp_server:update')) return;
   try {
     const envVarsObj: Record<string, string> = {};
     if (updates.envVars) {
@@ -1108,6 +1120,7 @@ export async function updateMcpServer(id: string, updates: Partial<MCPServer>) {
 }
 
 export async function deleteMcpServer(id: string) {
+  if (!checkPermissionAndNotify('mcp_server:delete')) return;
   try {
     await api.deleteMcpServer(id);
   } catch (err: any) {
@@ -1119,6 +1132,7 @@ export async function deleteMcpServer(id: string) {
 }
 
 export async function testMcpServer(id: string) {
+  if (!checkPermissionAndNotify('mcp_server:test')) return;
   try {
     const res = await api.testMcpServer(id);
     if (res.success) {
@@ -1135,6 +1149,7 @@ export async function testMcpServer(id: string) {
 
 // LLM Provider Operations
 export async function updateLlmProvider(id: string, updates: Partial<LLMProvider> & { apiKey?: string }) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return;
   try {
     const reqData = {
       apiKey: updates.apiKey,
@@ -1162,6 +1177,7 @@ export async function updateLlmProvider(id: string, updates: Partial<LLMProvider
 }
 
 export function addLlmProvider(provider: Omit<LLMProvider, 'id' | 'status'>) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return;
   const newProvider: LLMProvider = {
     ...provider,
     id: `llm-${Date.now().toString().slice(-4)}`,
@@ -1172,6 +1188,7 @@ export function addLlmProvider(provider: Omit<LLMProvider, 'id' | 'status'>) {
 }
 
 export function addModelToProvider(providerId: string, modelName: string) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return;
   const p = state.llmProviders.find((x) => x.id === providerId || x.code === providerId);
   if (p && modelName.trim()) {
     const trimmed = modelName.trim();
@@ -1185,6 +1202,7 @@ export function addModelToProvider(providerId: string, modelName: string) {
 }
 
 export function setDefaultModel(providerId: string, modelName: string) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return;
   const p = state.llmProviders.find((x) => x.id === providerId || x.code === providerId);
   if (p) {
     p.defaultModel = modelName;
@@ -1193,6 +1211,7 @@ export function setDefaultModel(providerId: string, modelName: string) {
 }
 
 export async function testLlmProvider(id: string) {
+  if (!checkPermissionAndNotify('llm_provider:test')) return;
   try {
     const res = await api.testLlmProvider(id);
     if (res.success) {
@@ -1207,7 +1226,7 @@ export async function testLlmProvider(id: string) {
 
 // User Management
 export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'lastLogin'>) {
-  if (!checkPermissionAndNotify('admin')) return;
+  if (!checkPermissionAndNotify('user:create')) return;
   try {
     const dto = await api.createUser({
       username: user.username,
@@ -1231,6 +1250,7 @@ export async function addUser(user: Omit<User, 'id' | 'createdAt' | 'lastLogin'>
 }
 
 export async function updateUser(id: string, updates: Partial<User>) {
+  if (!checkPermissionAndNotify('user:update')) return;
   try {
     if (updates.displayName || updates.email) {
       await api.updateProfile(id, { displayName: updates.displayName, email: updates.email });
@@ -1252,6 +1272,7 @@ export async function updateUser(id: string, updates: Partial<User>) {
 }
 
 export async function deleteUser(id: string) {
+  if (!checkPermissionAndNotify('user:delete')) return;
   try {
     await api.deleteUser(id);
   } catch (err: any) {
@@ -1263,6 +1284,7 @@ export async function deleteUser(id: string) {
 }
 
 export async function resetUserPassword(id: string, newPassword = 'NewPassword123') {
+  if (!checkPermissionAndNotify('user:reset_password')) return;
   try {
     await api.resetPassword(id, newPassword);
   } catch (err: any) {
@@ -1334,10 +1356,9 @@ export function useAppStore() {
   return {
     state,
     hasRole,
-    canWrite,
-    canManageUsers,
+    hasPermission,
+    hasAnyPermission,
     checkPermissionAndNotify,
-    switchRoleForTesting,
     addToast,
     removeToast,
     setRoute,

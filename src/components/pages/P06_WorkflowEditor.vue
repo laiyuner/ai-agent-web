@@ -44,6 +44,7 @@
           返回工作流列表
         </button>
         <button
+          v-if="hasPermission('workflow:create')"
           @click="createNewWorkflowInEditor"
           class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
         >
@@ -92,6 +93,7 @@
         <!-- Action Toolbar -->
         <div class="flex items-center gap-2">
           <button
+            v-if="hasPermission('workflow:update')"
             @click="addAgentNode"
             class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
           >
@@ -100,6 +102,7 @@
           </button>
 
           <button
+            v-if="hasPermission('workflow:update')"
             @click="addToolNode"
             class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
           >
@@ -108,6 +111,7 @@
           </button>
 
           <button
+            v-if="hasPermission('workflow:update')"
             @click="addConditionNode"
             class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer"
           >
@@ -115,9 +119,10 @@
             <span>+ 条件分支</span>
           </button>
 
-          <div class="h-4 w-px bg-slate-800 mx-1"></div>
+          <div v-if="hasPermission('workflow:update')" class="h-4 w-px bg-slate-800 mx-1"></div>
 
           <button
+            v-if="hasPermission('workflow:update')"
             @click="saveCanvas"
             :disabled="saving"
             class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5 border border-slate-700 cursor-pointer disabled:opacity-50"
@@ -127,6 +132,7 @@
           </button>
 
           <button
+            v-if="hasPermission('workflow:execute')"
             @click="handleRun"
             class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
           >
@@ -135,6 +141,7 @@
           </button>
 
           <button
+            v-if="hasPermission('workflow:delete')"
             @click="handleDeleteWorkflow"
             title="删除工作流"
             class="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 transition-colors cursor-pointer"
@@ -481,7 +488,7 @@ import { useAppStore, addWorkflow, updateWorkflow, deleteWorkflow, addToast } fr
 import RunInputDialog from '../common/RunInputDialog.vue';
 import { DAGNode, Workflow as WorkflowType } from '../../types';
 
-const { state, setRoute, canWrite, checkPermissionAndNotify } = useAppStore();
+const { state, setRoute, hasPermission, checkPermissionAndNotify } = useAppStore();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -589,8 +596,7 @@ function togglePublishStatus() {
 
 async function saveCanvas() {
   if (!currentWf.value) return;
-  if (!canWrite()) {
-    checkPermissionAndNotify('write');
+  if (!checkPermissionAndNotify('workflow:update')) {
     return;
   }
 

@@ -34,6 +34,14 @@ export interface Role {
 
 export type AgentType = 'ReAct' | 'Functions';
 
+/** Agent 与 MCP 服务器的绑定关系（与后端 agent_mcp 表对应） */
+export interface AgentMcpBinding {
+  mcpServerId: string;
+  mcpServerName: string;
+  /** 工具白名单，空数组 = 启用该 MCP 全部工具 */
+  enabledTools: string[];
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -46,7 +54,10 @@ export interface Agent {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
-  boundTools: string[]; // MCP Tool IDs or names
+  /** @deprecated 由 mcpBindings 派生的扁平工具名列表，仅用于旧展示点 */
+  boundTools: string[];
+  /** MCP 服务器绑定列表（编辑回显与提交的权威数据源） */
+  mcpBindings?: AgentMcpBinding[];
   timeout: number;
   maxRetries: number;
   retryBackoffMs: number;

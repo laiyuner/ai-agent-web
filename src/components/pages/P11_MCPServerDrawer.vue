@@ -97,8 +97,9 @@
           取消
         </button>
         <button
+          v-if="(isEdit && hasPermission('mcp_server:update')) || (!isEdit && hasPermission('mcp_server:create'))"
           @click="handleSubmit"
-          class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md transition-colors"
+          class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md transition-colors cursor-pointer"
         >
           {{ isEdit ? '保存修改' : '连接 MCP 服务' }}
         </button>
@@ -113,7 +114,7 @@ import { Server, X } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import { MCPServer, MCPTransportType } from '../../types';
 
-const { state, addMcpServer, updateMcpServer } = useAppStore();
+const { state, addMcpServer, updateMcpServer, hasPermission } = useAppStore();
 
 const isEdit = computed(() => !!state.editingMcp);
 

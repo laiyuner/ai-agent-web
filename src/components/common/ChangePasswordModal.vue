@@ -30,7 +30,7 @@
           <input
             v-model="newPassword"
             type="password"
-            placeholder="至少 8 位，包含大小写与数字/符号"
+            placeholder="至少 8 位，且需同时包含字母和数字"
             class="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -54,9 +54,10 @@
       <div class="pt-3 flex justify-end">
         <button
           @click="handleSubmit"
-          class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-xl shadow-md transition-all"
+          :disabled="submitting"
+          class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-70 text-white font-medium text-xs rounded-xl shadow-md transition-all"
         >
-          确认修改并开启系统
+          {{ submitting ? '正在提交...' : '确认修改并开启系统' }}
         </button>
       </div>
     </div>
@@ -74,14 +75,21 @@ const oldPassword = ref('');
 const newPassword = ref('');
 const confirmPassword = ref('');
 const error = ref('');
+const submitting = ref(false);
 
-function handleSubmit() {
+/** 与后端 AuthService.isValidPassword 规则一致：≥ 8 位且同时包含字母和数字 */
+function isValidNewPassword(pwd: string): boolean {
+  return pwd.length >= 8 && /[a-zA-Z]/.test(pwd) && /\d/.test(pwd);
+}
+
+async function handleSubmit() {
+  if (submitting.value) return;
   if (!oldPassword.value) {
     error.value = '请填入原初始密码';
     return;
   }
-  if (newPassword.value.length < 6) {
-    error.value = '新密码长度不得低于 6 位';
+  if (!isValidNewPassword(newPassword.value)) {
+    error.value = '新密码至少 8 位，且需同时包含字母和数字';
     return;
   }
   if (newPassword.value !== confirmPassword.value) {
@@ -89,6 +97,9 @@ function handleSubmit() {
     return;
   }
   error.value = '';
-  completePasswordReset();
+  submitting.value = true;
+  // 失败时 completePasswordReset 返回 false，弹窗保持打开并已通过 Toast 提示原因
+  await completePasswordReset(oldPassword.value, newPassword.value);
+  submitting.value = false;
 }
 </script>

@@ -16,6 +16,7 @@ import P17_Profile from '../components/pages/P17_Profile.vue';
 
 import { tokenManager } from '../api';
 import { state, refreshRouteData, fetchAllData, initUserFromSession, setRouterInstance, addToast } from '../stores/useAppStore';
+import { hasRole, hasAnyPermission } from '../permission';
 import { PageRoute, RoleType } from '../types';
 
 const routes: Array<RouteRecordRaw> = [
@@ -31,16 +32,16 @@ const routes: Array<RouteRecordRaw> = [
     children: [
       { path: '', redirect: '/dashboard' },
       { path: 'dashboard', name: 'dashboard', component: P04_Dashboard },
-      { path: 'workflows', name: 'workflows', component: P05_WorkflowList },
-      { path: 'workflows/editor/:id?', name: 'workflow-edit', component: P06_WorkflowEditor },
-      { path: 'execution-monitor', name: 'workflow-monitor', component: P07_ExecutionMonitor },
-      { path: 'agents', name: 'agents', component: P08_AgentList },
-      { path: 'mcp-servers', name: 'mcp-servers', component: P10_MCPServerList },
-      { path: 'llm-providers', name: 'llm-providers', component: P12_LLMProviderList },
-      { path: 'execution-history', name: 'runs', component: P13_ExecutionHistory },
-      { path: 'execution-detail/:id?', name: 'run-detail', component: P14_ExecutionDetail },
-      { path: 'users', name: 'users', component: P15_UserManagement, meta: { roles: ['ADMIN'] as RoleType[] } },
-      { path: 'roles', name: 'roles', component: P16_RoleManagement, meta: { roles: ['ADMIN'] as RoleType[] } },
+      { path: 'workflows', name: 'workflows', component: P05_WorkflowList, meta: { permissions: ['workflow:read'] } },
+      { path: 'workflows/editor/:id?', name: 'workflow-edit', component: P06_WorkflowEditor, meta: { permissions: ['workflow:read'] } },
+      { path: 'execution-monitor', name: 'workflow-monitor', component: P07_ExecutionMonitor, meta: { permissions: ['run:read'] } },
+      { path: 'agents', name: 'agents', component: P08_AgentList, meta: { permissions: ['agent:read'] } },
+      { path: 'mcp-servers', name: 'mcp-servers', component: P10_MCPServerList, meta: { permissions: ['mcp_server:read'] } },
+      { path: 'llm-providers', name: 'llm-providers', component: P12_LLMProviderList, meta: { permissions: ['llm_provider:read'] } },
+      { path: 'execution-history', name: 'runs', component: P13_ExecutionHistory, meta: { permissions: ['run:read'] } },
+      { path: 'execution-detail/:id?', name: 'run-detail', component: P14_ExecutionDetail, meta: { permissions: ['run:read'] } },
+      { path: 'users', name: 'users', component: P15_UserManagement, meta: { permissions: ['user:read'], roles: ['ADMIN'] as RoleType[] } },
+      { path: 'roles', name: 'roles', component: P16_RoleManagement, meta: { permissions: ['role:read'], roles: ['ADMIN'] as RoleType[] } },
       { path: 'profile', name: 'profile', component: P17_Profile },
     ],
   },
@@ -125,15 +126,29 @@ router.beforeEach(async (to, _from, next) => {
     // 已认证访问登录页 -> 跳转工作台
     next({ path: '/dashboard' });
   } else {
-    // 检查 RBAC 路由权限
+    // 检查 RBAC 路由权限与细粒度权限码
     const requiredRoles = to.meta.roles as RoleType[] | undefined;
+    const requiredPermissions = to.meta.permissions as string[] | undefined;
+
     if (requiredRoles && requiredRoles.length > 0) {
-      const userRole = state.currentUser?.role || 'VIEWER';
-      if (!requiredRoles.includes(userRole)) {
+      if (!hasRole(requiredRoles)) {
+        const userRole = state.currentUser?.role || 'VIEWER';
         addToast({
           type: 'warning',
           title: '访问受限',
           message: `您当前的角色 [${userRole}] 无权访问该管理模块，需要 [${requiredRoles.join(', ')}] 权限`,
+        });
+        next({ path: '/dashboard' });
+        return;
+      }
+    }
+
+    if (requiredPermissions && requiredPermissions.length > 0) {
+      if (!hasAnyPermission(requiredPermissions)) {
+        addToast({
+          type: 'warning',
+          title: '权限不足',
+          message: `访问此页面需要包含 [${requiredPermissions.join(', ')}] 中的权限，请联系管理员分配权限`,
         });
         next({ path: '/dashboard' });
         return;

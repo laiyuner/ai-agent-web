@@ -11,16 +11,12 @@
         <router-view :key="$route.fullPath" />
       </main>
     </div>
-
-    <!-- Modals -->
-    <ChangePasswordModal />
   </div>
 </template>
 
 <script setup lang="ts">
 import Header from '../components/common/Header.vue';
 import Sidebar from '../components/common/Sidebar.vue';
-import ChangePasswordModal from '../components/common/ChangePasswordModal.vue';
 import { useAppStore } from '../stores/useAppStore';
 
 const { state } = useAppStore();

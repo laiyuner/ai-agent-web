@@ -13,8 +13,9 @@
       </div>
 
       <button
+        v-if="hasPermission('workflow:create')"
         @click="createNewWorkflow"
-        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto"
+        class="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer"
       >
         <Plus class="w-4 h-4" />
         <span>新建 DAG 工作流</span>
@@ -77,10 +78,20 @@
               </div>
             </div>
             <div class="flex items-center gap-1">
-              <button @click="copyWorkflow(wf.id)" title="克隆副本" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+              <button
+                v-if="hasPermission('workflow:clone')"
+                @click="copyWorkflow(wf.id)"
+                title="克隆副本"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
                 <Copy class="w-4 h-4" />
               </button>
-              <button @click="deleteWorkflow(wf.id)" title="删除" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+              <button
+                v-if="hasPermission('workflow:delete')"
+                @click="deleteWorkflow(wf.id)"
+                title="删除"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
@@ -116,12 +127,12 @@
               @click="openEditor(wf.id)"
               class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer"
             >
-              画布编辑
+              {{ hasPermission('workflow:update') ? '画布编辑' : '查看拓扑' }}
             </button>
 
             <!-- 上线按钮（草稿状态显示） -->
             <button
-              v-if="wf.status !== 'published'"
+              v-if="wf.status !== 'published' && hasPermission('workflow:update')"
               @click="handlePublish(wf.id)"
               class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
               title="发布上线，允许生产调度"
@@ -132,7 +143,7 @@
 
             <!-- 下线按钮（已上线状态显示） -->
             <button
-              v-else
+              v-else-if="wf.status === 'published' && hasPermission('workflow:update')"
               @click="handleUnpublish(wf.id)"
               class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
               title="下线回草稿，可重新编辑"
@@ -142,6 +153,7 @@
             </button>
 
             <button
+              v-if="hasPermission('workflow:execute')"
               @click="openRunDialog(wf)"
               class="px-3.5 py-1.5 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
@@ -162,7 +174,11 @@
         <h3 class="font-bold text-slate-800 text-sm sm:text-base">暂无工作流数据</h3>
         <p class="text-xs text-slate-500 max-w-sm mx-auto">未找到匹配的工作流编排模板。您可以点击右上角新建 DAG 工作流。</p>
       </div>
-      <button @click="createNewWorkflow" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer">
+      <button
+        v-if="hasPermission('workflow:create')"
+        @click="createNewWorkflow"
+        class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+      >
         <Plus class="w-3.5 h-3.5" />
         <span>新建工作流</span>
       </button>
@@ -184,7 +200,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import RunInputDialog from '../common/RunInputDialog.vue';
 import { Workflow } from '../../types';
 
-const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows, publishWorkflow, unpublishWorkflow } = useAppStore();
+const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows, publishWorkflow, unpublishWorkflow, hasPermission } = useAppStore();
 
 const searchQuery = ref('');
 const statusFilter = ref('all');

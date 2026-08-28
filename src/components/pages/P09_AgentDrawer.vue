@@ -147,8 +147,9 @@
           取消
         </button>
         <button
+          v-if="(isEdit && hasPermission('agent:update')) || (!isEdit && hasPermission('agent:create'))"
           @click="handleSubmit"
-          class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md transition-colors"
+          class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md transition-colors cursor-pointer"
         >
           {{ isEdit ? '保存修改' : '确认创建' }}
         </button>
@@ -163,7 +164,7 @@ import { Bot, X } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import { Agent, AgentType } from '../../types';
 
-const { state, addAgent, updateAgent } = useAppStore();
+const { state, addAgent, updateAgent, hasPermission } = useAppStore();
 
 const isEdit = computed(() => !!state.editingAgent);
 
