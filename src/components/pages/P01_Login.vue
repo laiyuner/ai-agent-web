@@ -82,7 +82,6 @@
                 type="text"
                 required
                 class="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                placeholder="请输入用户名 (例: admin)"
               />
             </div>
           </div>
@@ -96,7 +95,6 @@
                 type="password"
                 required
                 class="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                placeholder="••••••••"
               />
             </div>
           </div>

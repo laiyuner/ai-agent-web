@@ -88,34 +88,40 @@
             :key="wf.id"
             class="p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/40 hover:bg-white transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs card-elevated"
           >
-            <div class="space-y-2 flex-1">
+            <div class="space-y-2 flex-1 min-w-0">
               <div class="flex items-center gap-2.5">
-                <span class="font-bold text-slate-900 text-sm sm:text-base">{{ wf.name }}</span>
                 <span
-                  class="text-xs px-2.5 py-0.5 rounded-full font-semibold"
+                  @click="openEdit(wf.id)"
+                  class="font-bold text-slate-900 text-sm sm:text-base hover:text-indigo-600 cursor-pointer transition-colors truncate block"
+                  :title="wf.name"
+                >
+                  {{ wf.name }}
+                </span>
+                <span
+                  class="text-xs px-2.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0"
                   :class="wf.status === 'published' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'"
                 >
                   {{ wf.status === 'published' ? '已上线' : '草稿' }}
                 </span>
               </div>
               <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">{{ wf.description }}</p>
-              <div class="text-xs text-slate-400 flex flex-wrap items-center gap-4 pt-1 font-mono">
-                <span>节点数: <strong class="text-slate-700">{{ wf.nodes.length }}</strong></span>
-                <span>创建人: <strong class="text-slate-700">{{ wf.author }}</strong></span>
-                <span>更新时间: {{ wf.updatedAt }}</span>
+              <div class="text-xs text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 font-mono">
+                <span class="whitespace-nowrap">节点数: <strong class="text-slate-700">{{ wf.nodeCount ?? wf.nodes?.length ?? 0 }}</strong></span>
+                <span class="whitespace-nowrap">创建人: <strong class="text-slate-700">{{ wf.author || '系统' }}</strong></span>
+                <span class="whitespace-nowrap">更新时间: {{ wf.updatedAt ? wf.updatedAt.slice(0, 16) : '-' }}</span>
               </div>
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0 self-end md:self-center">
               <button
                 @click="openEdit(wf.id)"
-                class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs sm:text-sm text-slate-800 font-semibold transition-colors cursor-pointer btn-tactile"
+                class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs sm:text-sm text-slate-800 font-semibold transition-colors cursor-pointer btn-tactile whitespace-nowrap"
               >
                 画布编辑
               </button>
               <button
                 @click="openRunDialog(wf)"
-                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer btn-tactile"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer btn-tactile whitespace-nowrap"
               >
                 <Play class="w-4 h-4 fill-current" />
                 <span>立即调度</span>
