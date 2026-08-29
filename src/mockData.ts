@@ -223,7 +223,7 @@ export const INITIAL_AGENTS: Agent[] = [
     maxRetries: 3,
     retryBackoffMs: 1000,
     updatedAt: '2026-07-28 11:20:00',
-    creator: 'admin',
+    creator: '系统管理员 (Admin)',
   },
   {
     id: 'ag-2',
@@ -249,7 +249,7 @@ export const INITIAL_AGENTS: Agent[] = [
     maxRetries: 3,
     retryBackoffMs: 1000,
     updatedAt: '2026-07-28 09:15:00',
-    creator: 'dev_chen',
+    creator: '陈建国 (高级编排师)',
   },
   {
     id: 'ag-3',
@@ -275,7 +275,7 @@ export const INITIAL_AGENTS: Agent[] = [
     maxRetries: 2,
     retryBackoffMs: 2000,
     updatedAt: '2026-07-27 17:40:00',
-    creator: 'admin',
+    creator: '系统管理员 (Admin)',
   },
   {
     id: 'ag-4',
@@ -301,7 +301,7 @@ export const INITIAL_AGENTS: Agent[] = [
     maxRetries: 3,
     retryBackoffMs: 1000,
     updatedAt: '2026-07-25 15:00:00',
-    creator: 'dev_chen',
+    creator: '陈建国 (高级编排师)',
   },
 ];
 
@@ -313,7 +313,7 @@ export const INITIAL_WORKFLOWS: Workflow[] = [
     status: 'published',
     isPublic: true,
     updatedAt: '2026-07-28 12:00:00',
-    author: 'admin',
+    author: '系统管理员 (Admin)',
     authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
     nodes: [
       {
@@ -366,7 +366,7 @@ export const INITIAL_WORKFLOWS: Workflow[] = [
     status: 'published',
     isPublic: true,
     updatedAt: '2026-07-27 16:20:00',
-    author: 'dev_chen',
+    author: '陈建国 (高级编排师)',
     authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
     nodes: [
       {
@@ -403,7 +403,7 @@ export const INITIAL_WORKFLOWS: Workflow[] = [
     status: 'draft',
     isPublic: false,
     updatedAt: '2026-07-26 10:45:00',
-    author: 'admin',
+    author: '系统管理员 (Admin)',
     nodes: [
       {
         id: 'node-start',

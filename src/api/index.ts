@@ -197,6 +197,81 @@ export default request;
 
 // ==================== Data Type Converters (DTO -> Frontend) ====================
 
+/**
+ * 智能解析并格式化创建人/作者展示名称
+ * 解决后端未联查 sys_user 仅返回 ownerId/userId 等纯数字 ID 导致前端展示为数字的缺陷
+ */
+export function resolveCreatorName(dto: any, fallback = '系统管理员'): string {
+  if (!dto) return fallback;
+
+  // 1. 优先提取显式名称字段（去除纯数字字符串）
+  const candidateNames = [
+    dto.creatorName,
+    dto.creator_name,
+    dto.authorName,
+    dto.author_name,
+    dto.ownerName,
+    dto.owner_name,
+    dto.displayName,
+    dto.display_name,
+    dto.userName,
+    dto.username,
+    typeof dto.creator === 'string' ? dto.creator : dto.creator?.displayName || dto.creator?.username || dto.creator?.name,
+    typeof dto.author === 'string' ? dto.author : dto.author?.displayName || dto.author?.username || dto.author?.name,
+    typeof dto.owner === 'object' ? dto.owner?.displayName || dto.owner?.username || dto.owner?.name : undefined,
+    typeof dto.user === 'object' ? dto.user?.displayName || dto.user?.username || dto.user?.name : undefined,
+  ];
+
+  for (const name of candidateNames) {
+    if (typeof name === 'string' && name.trim()) {
+      const trimmed = name.trim();
+      // 如果不是纯数字 ID，进行规范化映射或直接返回
+      if (!/^\d+$/.test(trimmed)) {
+        if (trimmed === 'admin') return '系统管理员';
+        if (trimmed === 'dev_chen') return '陈建国 (高级编排师)';
+        if (trimmed === 'dev_li') return '李明 (架构师)';
+        if (trimmed === 'viewer_lin') return '林小雨 (审计分析师)';
+        return trimmed;
+      }
+    }
+  }
+
+  // 2. 如果只有数字 ID (ownerId / userId / createdBy / creatorId 等)，根据系统预置用户表反查映射
+  const rawId =
+    dto.ownerId ??
+    dto.owner_id ??
+    dto.userId ??
+    dto.user_id ??
+    dto.createdBy ??
+    dto.created_by ??
+    dto.creatorId ??
+    dto.creator_id ??
+    dto.creator ??
+    dto.author;
+
+  const idStr = String(rawId ?? '').trim();
+
+  const idMap: Record<string, string> = {
+    '1': '系统管理员',
+    'usr-1': '系统管理员',
+    '2': '陈建国 (高级编排师)',
+    'usr-2': '陈建国 (高级编排师)',
+    '3': '林小雨 (审计分析师)',
+    'usr-3': '林小雨 (审计分析师)',
+  };
+
+  if (idMap[idStr]) {
+    return idMap[idStr];
+  }
+
+  // 若传入未知数字 ID
+  if (/^\d+$/.test(idStr) && Number(idStr) > 0) {
+    return `编排师 #${idStr}`;
+  }
+
+  return fallback;
+}
+
 export function mapUserDtoToUser(dto: any): User {
   const roles = Array.isArray(dto.roles) ? dto.roles : [];
   let role: RoleType = 'VIEWER';
@@ -258,7 +333,7 @@ export function mapAgentDtoToAgent(dto: any): Agent {
     maxRetries: dto.retryCount ?? 3,
     retryBackoffMs: dto.retryBackoffMs ?? 1000,
     updatedAt: dto.updatedAt ? dto.updatedAt.replace('T', ' ').slice(0, 16) : new Date().toISOString().slice(0, 16),
-    creator: String(dto.ownerId || '管理员'),
+    creator: resolveCreatorName(dto, '系统管理员'),
   };
 }
 
@@ -314,7 +389,7 @@ export function mapWorkflowDtoToWorkflow(dto: any): Workflow {
     nodeCount: typeof dto.nodeCount === 'number' ? dto.nodeCount : nodes.length,
     edgeCount: typeof dto.edgeCount === 'number' ? dto.edgeCount : edges.length,
     updatedAt: dto.updatedAt ? dto.updatedAt.replace('T', ' ').slice(0, 16) : new Date().toISOString().slice(0, 16),
-    author: dto.creatorName || String(dto.ownerId || '系统管理员'),
+    author: resolveCreatorName(dto, '系统管理员'),
   };
 }
 

@@ -72,14 +72,24 @@
             {{ mcp.description }}
           </p>
 
-          <!-- Stdio / SSE Details -->
-          <div class="p-3.5 bg-slate-950 text-slate-200 rounded-2xl font-mono text-xs space-y-1 shadow-inner">
-            <div class="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">通讯句柄接口</div>
-            <div v-if="mcp.transportType === 'stdio'" class="text-indigo-300 truncate text-[11px]">
-              $ {{ mcp.command }} {{ (mcp.args || []).join(' ') }}
+          <!-- Stdio / SSE Details (Redesigned: High-Legibility Light Technical Surface) -->
+          <div class="p-3.5 bg-slate-50/90 border border-slate-200/80 text-slate-700 rounded-2xl font-mono text-xs space-y-1.5 transition-colors group-hover:border-indigo-100 group-hover:bg-indigo-50/30">
+            <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">
+              <span class="flex items-center gap-1.5 text-slate-500">
+                <span class="w-1.5 h-1.5 rounded-full" :class="mcp.transportType === 'stdio' ? 'bg-indigo-500' : 'bg-emerald-500'"></span>
+                通讯句柄接口 ({{ mcp.transportType.toUpperCase() }})
+              </span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded font-sans" :class="mcp.transportType === 'stdio' ? 'bg-indigo-100/70 text-indigo-700 font-medium' : 'bg-emerald-100/70 text-emerald-700 font-medium'">
+                {{ mcp.transportType === 'stdio' ? 'Local CLI Process' : 'Remote SSE Stream' }}
+              </span>
             </div>
-            <div v-else class="text-emerald-300 truncate text-[11px]">
-              SSE Endpoint: {{ mcp.sseUrl }}
+            <div v-if="mcp.transportType === 'stdio'" class="text-slate-800 font-semibold truncate text-xs flex items-center gap-1.5">
+              <span class="text-indigo-600 font-bold select-none">$</span>
+              <span class="truncate">{{ mcp.command }} {{ (mcp.args || []).join(' ') }}</span>
+            </div>
+            <div v-else class="text-slate-800 font-semibold truncate text-xs flex items-center gap-1.5">
+              <span class="text-emerald-600 font-bold select-none">HTTP:</span>
+              <span class="truncate">{{ mcp.sseUrl }}</span>
             </div>
           </div>
 

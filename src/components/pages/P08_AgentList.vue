@@ -85,10 +85,18 @@
             {{ ag.description }}
           </p>
 
-          <!-- System Prompt Excerpt -->
-          <div class="p-3.5 rounded-2xl bg-slate-950 text-slate-200 space-y-1 font-mono text-xs shadow-inner">
-            <div class="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">System Prompt 角色指令</div>
-            <p class="line-clamp-2 text-slate-300 leading-snug text-[11px]">{{ ag.systemPrompt }}</p>
+          <!-- System Prompt Excerpt (Redesigned: Clear, High-Legibility Light Surface) -->
+          <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-1.5 transition-colors group-hover:border-indigo-100 group-hover:bg-indigo-50/30">
+            <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">
+              <span class="flex items-center gap-1.5 text-slate-500">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                System Prompt 角色指令
+              </span>
+              <span class="font-mono text-slate-400 font-normal">{{ ag.systemPrompt ? ag.systemPrompt.length : 0 }} 字符</span>
+            </div>
+            <p class="line-clamp-2 text-slate-700 font-mono leading-relaxed text-xs selection:bg-indigo-100">
+              {{ ag.systemPrompt }}
+            </p>
           </div>
 
           <!-- Parameters Summary -->

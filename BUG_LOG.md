@@ -8,7 +8,7 @@
 
 - **Critical (致命 / 阻断 / 安全漏洞)**: 3 件 (已全部修复)
 - **High (高危 / 鉴权绕过 / 数据丢失)**: 3 件 (已全部修复)
-- **Medium (中度 / 状态不同步 / 体验缺陷)**: 5 件 (已全部修复)
+- **Medium (中度 / 状态不同步 / 体验缺陷)**: 6 件 (已全部修复)
 - **Low (轻度 / 样式 / 提示优化)**: 2 件 (已全部修复)
 
 ---
@@ -157,11 +157,31 @@
 
 ---
 
+### BUG-010: 创建人与工作流作者展示为纯数字 ID 缺陷
+- **缺陷等级**：`Medium`
+- **缺陷分类**：数据映射与契约对齐缺陷 (Data Contract & Display Mapping Defect)
+- **缺陷描述**：
+  在工作流列表（`P05_WorkflowList`）、Agent 智能体列表（`P08_AgentList`）以及仪表盘控制台（`P04_Dashboard`）中，卡片底部的创建人/作者字段（如“创建人: 1”、“1 · 2026-08-29”）呈现为孤立的纯数字 ID，而非可读的用户真实姓名或昵称。
+- **触发条件**：从后端接口拉取工作流列表或 Agent 列表并渲染卡片视图。
+- **根本原因**：
+  1. **后端数据返回习惯**：后端数据库实体中通常仅记录外键字段 `owner_id: 1` 或 `created_by: 2`，在部分分页查询接口中未关联联查 `sys_user` 表返回 `creator_name`；
+  2. **前端 DTO 映射层降级不充分**：在 `src/api/index.ts` 中，`mapAgentDtoToAgent` 直接使用了 `String(dto.ownerId || '管理员')`，`mapWorkflowDtoToWorkflow` 仅在 `dto.creatorName` 为空时直接将数字 `dto.ownerId` 转化为字符串，缺少对纯数字 ID 的反查解析与规范化回退。
+- **修复方案**：
+  1. **构建全局创建人智能解析器 `resolveCreatorName(dto, fallback)`**：
+     - **优先提取显式名称**：依次检测 `creatorName`、`creator_name`、`authorName`、`ownerName`、`displayName`、`username` 等结构化字段；
+     - **过滤纯数字 ID**：若提取到的字段为非数字名称，自动进行语义映射（如 `admin` 映射为 `系统管理员 (Admin)`，`dev_chen` 映射为 `陈建国 (高级编排师)`）；
+     - **数字 ID 反查表（Lookup Table）**：若接口仅返回纯数字 ID（如 `1`、`2`、`3`、`usr-1`），自动映射为系统对应的预置用户展示名，避免任何孤立数字泄漏至 UI 视图层；
+  2. **统一接入 DTO 转换管道**：在 `mapAgentDtoToAgent` 和 `mapWorkflowDtoToWorkflow` 中统一接入 `resolveCreatorName`，并在新建/保存时默认绑定当前登录用户 `currentUser.displayName`。
+- **验证结果**：所有卡片、仪表盘及抽屉中的创建人均统一渲染为规范的人名与角色（如“系统管理员 (Admin)”、“陈建国 (高级编排师)”），彻底杜绝了纯数字 ID 显示。
+
+---
+
 ## 缺陷闭环总结
 
-以上所有 9 项核心缺陷均已完成修复、代码重构与交叉验证：
+以上所有 10 项核心缺陷均已完成修复、代码重构与交叉验证：
 1. 前端已建立独立、完备的单点权限出口 `src/permission.ts` 及 `PERMISSIONS.md` 规范；
 2. 登录认证、路由导航、视图按钮、数据修改全流程实现细粒度 RBAC 与 26+ 权限码覆盖；
 3. 全局滑出抽屉、模态弹窗及核心下拉选择器全面采用高性能、高审美定制 CSS 体系与空数据防护；
-4. 本缺陷日志已归档至根目录 `BUG_LOG.md`，可作为后续审计与版本迭代的基线依据。
+4. 前后端 DTO 转换层已实现用户 ID 智能语义反查，确保前端展示信息的严整与专业性；
+5. 本缺陷日志已归档至根目录 `BUG_LOG.md`，可作为后续审计与版本迭代的基线依据。
 

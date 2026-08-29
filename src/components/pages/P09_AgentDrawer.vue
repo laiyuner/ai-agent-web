@@ -349,21 +349,23 @@
               </div>
             </div>
 
-            <!-- Section 3: System Prompt -->
-            <div class="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">
-              <div class="flex items-center justify-between">
-                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  System Prompt 角色指令 <span class="text-rose-500">*</span>
+              <!-- Section 3: System Prompt -->
+              <div class="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                    <span>System Prompt 角色指令</span>
+                    <span class="text-rose-500">*</span>
+                  </div>
+                  <span class="text-[10px] text-slate-400 font-mono">{{ form.systemPrompt.length }} 字符</span>
                 </div>
-                <span class="text-[10px] text-slate-400 font-mono">{{ form.systemPrompt.length }} 字符</span>
+                <textarea
+                  v-model="form.systemPrompt"
+                  rows="6"
+                  placeholder="你是一名资深架构师... 请严格输出 JSON 格式。"
+                  class="w-full p-3.5 rounded-xl border border-slate-200 bg-white text-slate-800 font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs transition-all placeholder:text-slate-400"
+                ></textarea>
               </div>
-              <textarea
-                v-model="form.systemPrompt"
-                rows="6"
-                placeholder="你是一名资深架构师... 请严格输出 JSON 格式。"
-                class="w-full p-3 rounded-xl border border-slate-200 bg-slate-950 text-slate-100 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-inner"
-              ></textarea>
-            </div>
 
             <!-- Section 4: MCP Server Binding -->
             <div class="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">

@@ -71,26 +71,93 @@
             <div class="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">
               <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">协议传输架构 (Transport)</div>
 
-              <div>
+              <!-- Custom Transport Dropdown Popover -->
+              <div class="relative custom-mcp-dropdown" ref="transportDropdownRef">
                 <label class="block font-semibold text-slate-700 mb-1">通信类型</label>
-                <select
-                  v-model="form.transportType"
-                  class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                <button
+                  type="button"
+                  @click.stop="isTransportDropdownOpen = !isTransportDropdownOpen"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 flex items-center justify-between text-left transition-all cursor-pointer shadow-2xs"
                 >
-                  <option value="stdio">stdio (Standard I/O 命令行进程推流)</option>
-                  <option value="SSE">SSE (Server-Sent Events 远程 HTTP 长连接)</option>
-                </select>
+                  <div class="flex items-center gap-2.5 truncate">
+                    <div
+                      class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold"
+                      :class="form.transportType === 'stdio' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'"
+                    >
+                      <Terminal v-if="form.transportType === 'stdio'" class="w-3.5 h-3.5" />
+                      <Radio v-else class="w-3.5 h-3.5" />
+                    </div>
+                    <span class="font-semibold text-slate-800 text-xs">
+                      {{ form.transportType === 'stdio' ? 'stdio (本地命令行进程推流)' : 'SSE (远程 HTTP Server-Sent Events)' }}
+                    </span>
+                  </div>
+                  <ChevronDown
+                    class="w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200"
+                    :class="{ 'rotate-180 text-indigo-600': isTransportDropdownOpen }"
+                  />
+                </button>
+
+                <!-- Dropdown Menu -->
+                <Transition name="dropdown-pop">
+                  <div
+                    v-if="isTransportDropdownOpen"
+                    class="absolute top-full left-0 right-0 mt-1.5 z-30 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 space-y-1.5 text-xs select-none animate-in fade-in zoom-in-95 duration-150"
+                    @click.stop
+                  >
+                    <!-- stdio option -->
+                    <div
+                      @click="selectTransport('stdio')"
+                      class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5"
+                      :class="form.transportType === 'stdio' ? 'bg-indigo-50/80 border-indigo-200/90 text-indigo-950' : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'"
+                    >
+                      <div class="w-7 h-7 rounded-lg bg-indigo-100/70 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Terminal class="w-4 h-4" />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                          <span class="font-bold text-xs">stdio (Standard I/O)</span>
+                          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">推荐本地</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          子进程标准输入输出命令行调用，低延迟直接对接本地 npm/pip 算子包
+                        </p>
+                      </div>
+                      <Check v-if="form.transportType === 'stdio'" class="w-4 h-4 text-indigo-600 shrink-0 mt-1" />
+                    </div>
+
+                    <!-- SSE option -->
+                    <div
+                      @click="selectTransport('SSE')"
+                      class="p-2.5 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5"
+                      :class="form.transportType === 'SSE' ? 'bg-emerald-50/80 border-emerald-200/90 text-emerald-950' : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'"
+                    >
+                      <div class="w-7 h-7 rounded-lg bg-emerald-100/70 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Radio class="w-4 h-4" />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                          <span class="font-bold text-xs">SSE (Server-Sent Events)</span>
+                          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700">远程微服务</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          基于 HTTP 长连接的远程 RPC 服务端点，适合跨容器或公网云服务对接
+                        </p>
+                      </div>
+                      <Check v-if="form.transportType === 'SSE'" class="w-4 h-4 text-emerald-600 shrink-0 mt-1" />
+                    </div>
+                  </div>
+                </Transition>
               </div>
 
               <!-- Stdio Options -->
-              <div v-if="form.transportType === 'stdio'" class="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-3">
+              <div v-if="form.transportType === 'stdio'" class="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-3 shadow-2xs">
                 <div>
                   <label class="block font-semibold text-slate-700 mb-1">启动命令 (Command)</label>
                   <input
                     v-model="form.command"
                     type="text"
-                    placeholder="npx / node / python"
-                    class="w-full px-3 py-1.5 bg-slate-50/50 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    placeholder="例如: npx / node / python"
+                    class="w-full px-3.5 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
                 </div>
                 <div>
@@ -99,20 +166,20 @@
                     v-model="argsString"
                     type="text"
                     placeholder="-y, @modelcontextprotocol/server-postgres"
-                    class="w-full px-3 py-1.5 bg-slate-50/50 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    class="w-full px-3.5 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
                 </div>
               </div>
 
               <!-- SSE Options -->
-              <div v-if="form.transportType === 'SSE'" class="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-3">
+              <div v-if="form.transportType === 'SSE'" class="p-3.5 bg-white border border-slate-200/80 rounded-xl space-y-3 shadow-2xs">
                 <div>
                   <label class="block font-semibold text-slate-700 mb-1">SSE URL Endpoint</label>
                   <input
                     v-model="form.sseUrl"
                     type="text"
                     placeholder="http://localhost:8081/sse"
-                    class="w-full px-3 py-1.5 bg-slate-50/50 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    class="w-full px-3.5 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   />
                 </div>
               </div>
@@ -143,14 +210,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { Server, X } from 'lucide-vue-next';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import {
+  Server,
+  X,
+  ChevronDown,
+  Check,
+  Terminal,
+  Radio,
+} from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import { MCPServer, MCPTransportType } from '../../types';
 
 const { state, addMcpServer, updateMcpServer, hasPermission } = useAppStore();
 
 const isEdit = computed(() => !!state.editingMcp);
+
+const isTransportDropdownOpen = ref(false);
+const transportDropdownRef = ref<HTMLElement | null>(null);
+
+function selectTransport(type: MCPTransportType) {
+  form.value.transportType = type;
+  isTransportDropdownOpen.value = false;
+}
+
+function handleDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (!target.closest('.custom-mcp-dropdown')) {
+    isTransportDropdownOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick);
+});
 
 const form = ref({
   name: '',
