@@ -1,83 +1,79 @@
-# AgentForge - AI 智能体与工作流管理平台 (Web前端)
+# AgentForge - 企业级多智能体协同调度引擎 (AgentForge Web)
 
-AgentForge 是一个基于 Vue 3、TypeScript 和 Tailwind CSS 构建的高性能 AI 智能体 (Agent) 与自动化工作流 (Workflow) 编排平台前端系统。支持可视化智能体配置、多节点工作流拖拽/连线、知识库管理、日志监控以及基于双 Token 架构的安全认证。
-
----
-
-## 🛠️ 技术栈
-
-- **核心框架**：Vue 3 (Composition API / Script Setup)
-- **构建工具**：Vite
-- **开发语言**：TypeScript
-- **状态管理**：Pinia / Reactivity Store
-- **样式方案**：Tailwind CSS + Lucide Icons
-- **网络请求**：Axios (支持 `withCredentials` Cookie 传输与全局 401 静默刷新)
-- **图形与图表**：ECharts / Recharts / Canvas 流程图渲染
+> **AgentForge** 是一套基于 **Vue 3 + TypeScript + Tailwind CSS** 构建的高性能、企业级 AI 智能体编排与自动化协同调度系统。提供多智能体拓扑编排、MCP (Model Context Protocol) 协议服务器生态、DAG 可视化工作流引擎、实时高频日志与流式监控、多模型供应商集成以及基于 RBAC 的细粒度权限控制体系。
 
 ---
 
-## ✨ 核心功能模块
+## 🛠️ 技术栈选型
 
-1. **双令牌认证体系 (v2.0)**
-   - **Access Token** 存储于前端内存，用于 API 授权请求（传输头：`Authorization: Bearer <token>`）。
-   - **Refresh Token** 托管于后端 `httpOnly` Cookie，前端防 XSS 注入。
-   - 全局 Axios 拦截器，支持 401 无感并发刷新队列与静默恢复登录态。
-   - 登录失败响应规范化（HTTP 400：1001/1002/1003），隔离认证失效与凭证校验错误。
-
-2. **智能体控制台 (Agent Workbench)**
-   - 智能体创建、角色提示词 (System Prompt) 设定、模型参数调优 (Temperature, Top-P)。
-   - 知识库与工具插件 (Tools/Plugins) 绑定。
-   - 实时对话测试与交互调优。
-
-3. **工作流编排器 (Workflow Builder)**
-   - 可视化工作流节点配置（LLM 节点、条件分支、代码执行、API 调起等）。
-   - 实时运行日志与节点状态追踪。
-
-4. **知识库管理 (Knowledge Base)**
-   - 向量化文档上传、分块策略设定与检索测试。
-
-5. **系统监控与日志 (Analytics & Logs)**
-   - Token 消耗统计、调用延迟监控与历史调用日志查看。
-
-6. **角色与权限控制 (RBAC 体系)**
-   - 细粒度支持 **超级管理员 (ADMIN)**、**开发者 (DEVELOPER)** 及 **审计访客 (VIEWER)** 角色。
-   - 路由前置守卫拦截、Store 写操作安全校验、菜单动态显隐与快捷角色测试面板。
+- **核心框架**：Vue 3 (`<script setup lang="ts">` / Composition API)
+- **构建工具**：Vite 6
+- **开发语言**：TypeScript 5.8 (强类型定义、严格模式检查)
+- **样式体系**：Tailwind CSS v4 + 响应式布局 + 大厂设计规范（Stripe / GitHub / Vercel 风格）
+- **图标组件库**：`lucide-vue-next` (现代化细致矢量图标)
+- **状态管理**：Pinia 响应式单向数据流 Store (`useAppStore.ts`)
+- **网络通信**：Axios (支持 `withCredentials` Cookie 传输、双令牌静默刷新与请求队列)
+- **可视化图形**：原生 SVG 高性能动态贝塞尔连线 + Canvas DAG 工作流编排
 
 ---
 
-## ⚡ 性能优化与架构设计
+## ✨ 核心功能模块清单
 
-详细技术文档与架构拆解请参阅 [OPTIMIZATION.md](./OPTIMIZATION.md)。
+### 1. 🎛️ 系统工作台与全局总览 (`P04_Dashboard`)
+- **核心业务指标**：智能体总数、活跃工作流、MCP 服务状态、今日调度总量实时大盘。
+- **快捷调度操作**：一键发起工作流调试、快捷跳转 Agent 智能体池。
+- **状态响应式联动**：全局监控推流状态与顶部 Header 徽章毫秒级同步。
 
-1. **运行历史到推流监控无感平滑切换 (零卡顿 / 消除白屏)**
-   - **优化场景**：从运行历史审计页（`P13_ExecutionHistory.vue`）跳转至实时推流监控页（`P07_ExecutionMonitor.vue`）。
-   - **实现策略**：挂载阶段优先同步读取 AppStore 本地单据树实现首帧瞬间渲染，彻底消除网络请求等待导致的空白页；配合后台无缝数据补全与离屏骨架屏，获得秒级平滑过渡体验。
+### 2. 🤖 智能体管理与抽屉配置 (`P08_AgentList` / `P09_AgentDrawer`)
+- **Agent 角色定义**：名称、System Prompt 角色提示词设定、模型绑定与温度 (`temperature`)、`top_p` 参数调节。
+- **MCP 扩展工具绑定**：一键挂载已注册的 MCP 工具服务器，赋予智能体外部工具调用与环境交互能力。
+- **知识库关联**：向量数据库检索配置与相关度阀值调节。
+- **抽屉式工程化交互**：响应式滑出抽屉、吸顶状态头、表单独立滚动与吸底操作栏。
 
-2. **实时推流完成与全站状态响应式同步 (侧边栏 & 顶栏指示器)**
-   - **优化场景**：推流运行完成、失败或用户主动终止时的状态对齐。
-   - **实现策略**：在 Store 中新增 `updateRunInStore` 原子更新方法，结合不区分大小写的状态计算逻辑，使推流结束瞬间左侧导航栏 `推流中` 高亮徽章即刻消失，顶部 Header 推流指示器同步归零。
+### 3. 🔌 MCP (Model Context Protocol) 工具服务生态 (`P10_MCPServerList` / `P11_MCPServerDrawer`)
+- **双协议传输支持**：
+  - **stdio**：本地进程 Standard I/O 命令行通道 (npx / python / node)。
+  - **SSE**：Server-Sent Events 远程 HTTP 长连接与流式端点。
+- **服务健康度探测**：一键握手连通性测试与响应延迟探测。
+- **工具/资源列表视图**：直观展示 MCP 服务暴露的 Tool、Resource 与 Prompt 模板清单。
 
-3. **DAG 画布帧率平滑 (RAF 拖拽节流)**
-   - **优化场景**：工作流编辑器 (`P06_WorkflowEditor.vue`) 中的节点拖拽与动态 SVG 贝塞尔曲线重绘。
-   - **实现策略**：引入 `requestAnimationFrame` 锁机制对高频 `mousemove` 坐标更新进行帧率平滑限制，确保拖拽响应锁定在 60fps/120fps 原生刷新率，消除连续 Layout/Reflow 导致的画面 Jank。
+### 4. 🔀 可视化 DAG 工作流编排器 (`P05_WorkflowList` / `P06_WorkflowEditor`)
+- **节点类型全覆盖**：
+  - `start` (触发起点)
+  - `agent` (智能体调用)
+  - `llm` (基础大模型直调)
+  - `condition` (条件判断分支)
+  - `tool` (MCP 工具执行)
+  - `code` (自定义脚本运行)
+  - `end` (汇总输出终点)
+- **RAF 拖拽节流**：通过 `requestAnimationFrame` 限制节点高频移动坐标，保持 60fps/120fps 原生流畅度。
+- **动态 SVG 贝塞尔连线**：节点端口智能吸附与连线绘制，支持端点高亮与端口交互。
+- **版本控制与回退**：内置工作流历史版本备份、状态快照与回滚机制。
 
-4. **流式 Token 与高频终端日志渲染**
-   - **优化场景**：执行监控与调试页 (`P07_ExecutionMonitor.vue`) 高频 SSE/WebSocket 实时推流。
-   - **实现策略**：采用 RAF 批量合并滚动计算与 DOM 更新，避免频繁触发 `scrollTop` 计算；内置 1000 条内存日志环形保护 (Ring Buffer)，防止长时运行内存溢出。
+### 5. ⚡ 实时推流监控与执行历史 (`P07_ExecutionMonitor` / `P13_ExecutionHistory` / `P14_ExecutionDetail`)
+- **零白屏秒开切换**：从历史审计页无缝过渡到实时监控页，本地数据优先首帧上屏。
+- **流式 Token 渲染**：高频流式输出与日志终端滚动，内置 1000 条 Ring Buffer 防内存溢出。
+- **多维度检索与分段筛选**：支持按运行状态（全部 / 运行中 / 成功 / 终止 / 失败）与关键词快速过滤。
+- **运行时调度弹窗**：支持配置运行时环境变量、动态 Payload 参数并发起执行。
 
-5. **Vite 细粒度 Code Splitting (代码分割)**
-   - **优化场景**：首屏加载性能与静态资源缓存利用率。
-   - **实现策略**：在 `vite.config.ts` 配置 Rollup `manualChunks` 策略：
-     - `vue-vendor`: 独立拆分 `vue` / `vue-router` 框架核心库。
-     - `icons`: 独立打包 `lucide-vue-next` 大型矢量图标库。
-     - `vendor`: 其余第三方依赖分包，提升浏览器 HTTP 长期缓存命中率。
+### 6. 🌐 大模型供应商中枢 (`P12_LLMProviderList`)
+- **主流供应商原生支持**：DeepSeek、OpenAI、Anthropic Claude、Google Gemini、Ollama 本地大模型。
+- **模型挂载与管理**：支持一键切换全局默认模型、动态追加挂载模型。
+- **Base URL 代理与 API 密钥掩码**：支持自定义反向代理端点，前端密钥掩码存储并提供快速连通性测试。
 
-6. **全局 UI/UX 手感规范**
-   - 全局注入可点击元素（`<button>`, `<a>`, `<select>`, `[role="button"]`）的 `cursor: pointer` 强约束，与 `disabled` 状态下的 `cursor: not-allowed` 统一触感。
+### 7. 🛡️ RBAC 权限矩阵与用户安全体系 (`P15_UserManagement` / `P16_RoleManagement` / `P17_Profile`)
+- **三层角色体系**：
+  - **超级管理员 (ADMIN)**：拥有全站所有模块的读取、创建、编辑、删除与系统运维特权。
+  - **开发者 (DEVELOPER)**：支持工作流编排、Agent 与 MCP 配置、发起调度测试。
+  - **审计访客 (VIEWER)**：只读查看大盘与调度日志，屏蔽所有写操作与敏感管理入口。
+- **细粒度权限控制**：路由前置守卫拦截 + Store 写操作权限双重校验 + 按钮级权限显隐控制。
+- **用户安全**：支持强制重置初始密码、账号冻结/解冻、个人资料与头像维护。
 
 ---
 
-## 🔒 认证架构 (v2.0 双令牌模型)
+## 🔒 认证架构 (v2.0 双令牌安全体系)
+
+系统采用符合现代 Web 安全规范的双 Token 鉴权架构：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -85,50 +81,115 @@ AgentForge 是一个基于 Vue 3、TypeScript 和 Tailwind CSS 构建的高性�
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Access Token (2小时)          Refresh Token (7天)          │
-│  ├─ 存储：前端内存 / TokenManager ├─ 存储：httpOnly cookie      │
-│  ├─ 用途：API 请求认证          ├─ 用途：换取新 access token  │
+│  ├─ 存储：前端内存 / TokenManager ├─ 存储：httpOnly Cookie      │
+│  ├─ 用途：API 请求认证          ├─ 用途：换取新 Access Token  │
 │  ├─ 传输：Authorization Header ├─ 传输：浏览器自动携带 Cookie │
-│  └─ JS 可读：是                 └─ JS 可读：否（防 XSS）      │
+│  └─ JS 可读：是                 └─ JS 可读：否（彻底杜绝 XSS）│
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+- **并发静默刷新**：当 Access Token 过期收到 `401 Unauthorized` 时，Axios 响应拦截器会自动暂停后续请求，将它们挂入等待队列，使用 Refresh Token 换取新令牌后自动重放，用户全程无感知。
+- **错误代码隔离**：登录失败响应采用规范化 HTTP 400（业务代码 `1001` 用户名不存在 / `1002` 密码错误 / `1003` 账号已冻结），隔离认证失效与业务校验异常。
+
 ---
 
-## 🚀 快速开始
+## 🎨 UI/UX 体验与大厂交互设计规范
 
-### 1. 环境准备
+系统遵循 GitHub、Stripe、Vercel 等现代企业级产品的交互与视觉规范：
 
-- Node.js 18.x 或更高版本
-- npm / pnpm / yarn
+- **触觉反馈 (Tactile Feedback)**：全局封装 `btn-tactile`，在按钮按下（Active）时提供自然细腻的 `scale-0.97` 按压微动效。
+- **分层投影与卡片悬浮 (Card Elevation)**：交互卡片配置 `card-elevated`，在悬停时提供平滑的微上浮与柔和阴影过渡。
+- **胶囊分段选项卡 (Segmented Controls)**：列表筛选器采用紧凑的圆角胶囊分段控制器，集成实时数量角标。
+- **吸顶表头与斑马纹**：长表格（执行历史、用户列表、权限矩阵）采用半透明背景 `sticky top-0` 吸顶表头与交替浅灰斑马纹。
+- **抽屉吸底操作栏**：配置抽屉表单内容与操作按钮解耦，内容独立滚动，操作栏固定吸底，提升长表单操作效率。
+- **全局轻量滚动条**：重写了浏览器全局滚动条样式，减少视觉干扰。
+- **智能点击外部收起**：顶部用户菜单、弹窗与交互浮层均支持 `click-outside` 自动收起与流畅淡入淡出动画。
 
-### 2. 安装依赖
+---
+
+## 📁 项目工程目录结构
+
+```
+.
+├── src/
+│   ├── api/                      # Axios 实例配置、TokenManager、接口定义
+│   │   ├── client.ts             # 统一网络请求客户端与 401 刷新拦截器
+│   │   └── tokenManager.ts       # 内存级 Access Token 管理器
+│   ├── components/               # 组件体系
+│   │   ├── common/               # 全局公共组件
+│   │   │   ├── Header.vue        # 顶部导航栏与用户信息下拉菜单
+│   │   │   ├── Sidebar.vue       # 侧边栏导航与推流状态指示器
+│   │   │   ├── Toast.vue         # 全局轻提示与状态反馈
+│   │   │   ├── RunInputDialog.vue # 工作流调度参数配置弹窗
+│   │   │   └── ChangePasswordModal.vue # 初始密码重置弹窗
+│   │   └── pages/                # 页面视图组件
+│   │       ├── P01_Login.vue           # 身份登录与认证页
+│   │       ├── P04_Dashboard.vue       # 平台核心概览看板
+│   │       ├── P05_WorkflowList.vue    # 工作流编排管理列表
+│   │       ├── P06_WorkflowEditor.vue  # DAG 可视化拖拽画布编辑器
+│   │       ├── P07_ExecutionMonitor.vue # 实时推流监控与日志终端
+│   │       ├── P08_AgentList.vue       # 智能体池列表
+│   │       ├── P09_AgentDrawer.vue     # 智能体配置与 MCP 挂载抽屉
+│   │       ├── P10_MCPServerList.vue   # MCP 工具服务器列表
+│   │       ├── P11_MCPServerDrawer.vue # MCP 服务注册与协议配置抽屉
+│   │       ├── P12_LLMProviderList.vue # 大模型供应商与 API Key 配置
+│   │       ├── P13_ExecutionHistory.vue # 全量执行历史日志审计
+│   │       ├── P14_ExecutionDetail.vue # 单次调度运行详情
+│   │       ├── P15_UserManagement.vue  # 平台成员与账号管理
+│   │       ├── P16_RoleManagement.vue  # RBAC 角色权限矩阵
+│   │       └── P17_Profile.vue         # 个人资料与偏好设置
+│   ├── stores/                   # 状态仓库
+│   │   └── useAppStore.ts        # 全局应用状态管理 (用户/工作流/Agent/MCP/日志)
+│   ├── types/                    # TypeScript 类型定义
+│   │   └── index.ts              # 核心数据模型 (User, Workflow, Node, MCP, Run 等)
+│   ├── utils/                    # 辅助工具函数库
+│   ├── App.vue                   # 根组件
+│   └── main.ts                   # 应用程序入口配置
+├── public/                       # 静态资源目录
+├── index.html                    # SPA 入口 HTML
+├── package.json                  # 项目依赖与运行脚本
+├── vite.config.ts                # Vite 构建、打包分块与代理配置
+├── OPTIMIZATION.md               # 专项架构设计与性能优化文档
+└── README.md                     # 平台详细说明文档
+```
+
+---
+
+## 🚀 快速启动指南
+
+### 1. 环境依赖要求
+
+- **Node.js**：`>= 18.0.0`
+- **包管理器**：`npm` / `pnpm` / `yarn`
+
+### 2. 安装项目依赖
 
 ```bash
 npm install
 ```
 
-### 3. 开发环境运行
+### 3. 启动开发服务器
 
-启动前端 Vite 开发服务器（默认端口 `3000`，代理后端服务 `http://localhost:8080`）：
+启动 Vite 开发服务器（应用监听 `0.0.0.0:3000` 端口）：
 
 ```bash
 npm run dev
 ```
 
-浏览器访问：`http://localhost:3000`
+启动后可在浏览器中访问：`http://localhost:3000`
 
-### 4. 项目打包
+### 4. 构建生产产物
 
-生成生产环境静态构建产物：
+生成生产环境极致优化的静态资源：
 
 ```bash
 npm run build
 ```
 
-构建输出路径：`dist/`
+构建输出路径为 `dist/` 目录。
 
-### 5. 语法规范与 Lint 检查
+### 5. TypeScript 类型校验与 Lint 检查
 
 ```bash
 npm run lint
@@ -136,15 +197,16 @@ npm run lint
 
 ---
 
-## ⚙️ Vite 代理与跨域配置 (`vite.config.ts`)
+## ⚙️ Vite 代理与跨域通信配置 (`vite.config.ts`)
 
-开发模式下 Vite 已配置跨域代理与 Cookie 域名重写，支持带有 `httpOnly` 标记的 `agentforge_refresh_token` Cookie 顺畅传输：
+开发环境下已配置好反向代理与 `httpOnly` Cookie 域名重写：
 
 ```typescript
 // vite.config.ts
 export default defineConfig({
   server: {
     port: 3000,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
@@ -157,32 +219,21 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router'],
+          'icons': ['lucide-vue-next'],
+        },
+      },
+    },
+  },
 });
-```
-
----
-
-## 📁 项目目录结构
-
-```
-.
-├── src/
-│   ├── api/             # Axios 实例配置、TokenManager、接口定义
-│   ├── components/      # 通用 UI 组件与页面视图组件 (P01_Login, P02_Dashboard 等)
-│   ├── stores/          # 状态管理 (useAppStore.ts)
-│   ├── types/           # TypeScript 全局接口与数据模型定义
-│   ├── utils/           # 工具函数与格式化方法
-│   ├── App.vue          # 根组件
-│   └── main.ts          # 应用入口文件
-├── public/              # 静态资源
-├── index.html           # HTML 入口
-├── package.json         # 项目依赖与脚本配置
-├── vite.config.ts       # Vite 构建与代理配置
-└── README.md            # 项目说明文档
 ```
 
 ---
 
 ## 📝 开源协议
 
-MIT License
+本项目采用 [MIT License](LICENSE) 开源协议。
