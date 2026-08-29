@@ -1,31 +1,32 @@
 <template>
   <Teleport to="body">
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 select-none"
-    >
+    <Transition name="modal-fade">
       <div
-        class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-slate-100 relative"
+        v-if="isOpen"
+        class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 select-none"
       >
-        <!-- Header -->
-        <div class="flex items-start justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
-              <Play class="w-5 h-5 fill-current" />
+        <div
+          class="modal-panel w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-slate-100 relative"
+        >
+          <!-- Header -->
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                <Play class="w-5 h-5 fill-current" />
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-white">执行工作流：{{ workflow?.name || '未定义工作流' }}</h3>
+                <p class="text-xs text-slate-400 mt-0.5">请输入工作流的执行内容，这将作为起始节点的输入</p>
+              </div>
             </div>
-            <div>
-              <h3 class="text-base font-bold text-white">执行工作流：{{ workflow?.name || '未定义工作流' }}</h3>
-              <p class="text-xs text-slate-400 mt-0.5">请输入工作流的执行内容，这将作为起始节点的输入</p>
-            </div>
+            <button
+              @click="handleClose"
+              :disabled="loading"
+              class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 cursor-pointer"
+            >
+              <X class="w-4 h-4" />
+            </button>
           </div>
-          <button
-            @click="handleClose"
-            :disabled="loading"
-            class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30 cursor-pointer"
-          >
-            <X class="w-4 h-4" />
-          </button>
-        </div>
 
         <!-- Input Area -->
         <div class="space-y-2">
@@ -74,7 +75,8 @@
         </div>
       </div>
     </div>
-  </Teleport>
+  </Transition>
+</Teleport>
 </template>
 
 <script setup lang="ts">

@@ -99,3 +99,67 @@
   transform: translateY(-2px);
   box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
 }
+
+/* ==========================================================================
+   右侧滑出抽屉 (Drawer) 丝滑转场动效体系
+   解决嵌套 Transition 与背景透明度冲突导致的"黑影"与边缘破碎问题
+   ========================================================================== */
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.drawer-fade-enter-active .drawer-backdrop,
+.drawer-fade-leave-active .drawer-backdrop {
+  transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.drawer-fade-enter-active .drawer-panel,
+.drawer-fade-leave-active .drawer-panel {
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 1; /* 保持容器不突变，仅由子元素各自过渡 */
+}
+
+.drawer-fade-enter-from .drawer-backdrop,
+.drawer-fade-leave-to .drawer-backdrop {
+  opacity: 0 !important;
+}
+
+.drawer-fade-enter-from .drawer-panel,
+.drawer-fade-leave-to .drawer-panel {
+  transform: translateX(100%) !important;
+}
+
+/* ==========================================================================
+   居中模态弹窗 (Modal) 丝滑微缩放动效
+   ========================================================================== */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+
+.modal-fade-enter-active .modal-panel,
+.modal-fade-leave-active .modal-panel {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0 !important;
+}
+
+.modal-fade-enter-from .modal-panel,
+.modal-fade-leave-to .modal-panel {
+  transform: scale(0.96) translateY(6px) !important;
+  opacity: 0 !important;
+}
+

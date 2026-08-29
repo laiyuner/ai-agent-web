@@ -1,26 +1,22 @@
 <template>
-  <Transition
-    enter-active-class="transition ease-out duration-200"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition ease-in duration-150"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="state.agentDrawerOpen"
-      class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex justify-end"
-      @click.self="closeDrawer"
-    >
-      <Transition
-        enter-active-class="transition ease-out duration-300 transform"
-        enter-from-class="translate-x-full"
-        enter-to-class="translate-x-0"
-        leave-active-class="transition ease-in duration-200 transform"
-        leave-from-class="translate-x-0"
-        leave-to-class="translate-x-full"
+  <Teleport to="body">
+    <Transition name="drawer-fade">
+      <div
+        v-if="state.agentDrawerOpen"
+        class="fixed inset-0 z-50 overflow-hidden flex justify-end"
+        role="dialog"
+        aria-modal="true"
       >
-        <div class="w-full max-w-xl bg-white h-full shadow-2xl border-l border-slate-200/90 flex flex-col justify-between overflow-hidden">
+        <!-- Backdrop with smooth opacity fade -->
+        <div
+          class="drawer-backdrop fixed inset-0 bg-slate-900/25 backdrop-blur-[2px] cursor-pointer"
+          @click="closeDrawer"
+        />
+
+        <!-- Slide-over Drawer Panel -->
+        <div
+          class="drawer-panel relative z-10 w-full max-w-xl bg-white h-full shadow-[-12px_0_40px_-6px_rgba(15,23,42,0.14)] border-l border-slate-200/90 flex flex-col justify-between overflow-hidden"
+        >
           <!-- Sticky Header -->
           <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md sticky top-0 z-10 shrink-0">
             <div class="flex items-center gap-2.5">
@@ -237,9 +233,9 @@
             </button>
           </div>
         </div>
-      </Transition>
-    </div>
-  </Transition>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
