@@ -150,6 +150,7 @@
 import { ref, computed, watch } from 'vue';
 import { Bot, Plus, Search, Copy, Trash2, Sliders } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
+import { api, mapAgentDtoToAgent } from '../../api';
 import P09_AgentDrawer from './P09_AgentDrawer.vue';
 import { Agent } from '../../types';
 
@@ -180,8 +181,13 @@ function openCreateDrawer() {
   state.agentDrawerOpen = true;
 }
 
-function openEditDrawer(ag: Agent) {
-  state.editingAgent = ag;
+async function openEditDrawer(ag: Agent) {
+  try {
+    const dto = await api.getAgent(ag.id);
+    state.editingAgent = mapAgentDtoToAgent(dto);
+  } catch (err: any) {
+    state.editingAgent = ag;
+  }
   state.agentDrawerOpen = true;
 }
 </script>

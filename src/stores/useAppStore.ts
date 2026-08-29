@@ -93,7 +93,14 @@ const mockAgents: Agent[] = [
     temperature: 0.7,
     maxTokens: 2000,
     systemPrompt: '你是一名资深系统架构师。请严谨提取用户需求中的业务边界、数据模型与并发预期。',
-    boundTools: ['t-1', 't-2'],
+    boundTools: ['read_query'],
+    mcpBindings: [
+      {
+        mcpServerId: '1',
+        mcpServerName: 'PostgreSQL 本地数据库探针',
+        enabledTools: ['read_query'],
+      },
+    ],
     timeout: 60,
     maxRetries: 3,
     retryBackoffMs: 1000,

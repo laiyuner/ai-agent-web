@@ -130,37 +130,52 @@
               ></textarea>
             </div>
 
-            <!-- Section 4: MCP Tools Binding -->
+            <!-- Section 4: MCP Server Binding -->
             <div class="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">
               <div class="flex items-center justify-between">
-                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">绑定 MCP 工具权限</div>
+                <label class="block font-semibold text-slate-700">绑定 MCP 服务器</label>
                 <span class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-mono font-bold">
-                  已选 {{ form.boundTools.length }} 个工具
+                  已选 {{ boundServerIds.length }} 个服务器
                 </span>
               </div>
-              <div class="p-3 bg-white border border-slate-200/80 rounded-xl space-y-3 max-h-48 overflow-y-auto">
-                <div v-for="mcp in state.mcpServers" :key="mcp.id" class="space-y-1.5">
-                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    <span>{{ mcp.name }}</span>
-                  </div>
-                  <div class="space-y-1.5 pl-3">
-                    <label
-                      v-for="tool in mcp.tools"
-                      :key="tool.id"
-                      class="flex items-start gap-2.5 p-1.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
+              <p class="text-[10px] text-slate-400 leading-relaxed">
+                勾选需要挂载到该 Agent 的 MCP 服务器；勾选后可填写工具白名单（逗号分隔工具名），
+                留空表示启用该服务器的全部工具。
+              </p>
+              <div class="p-3 bg-white border border-slate-200/80 rounded-xl space-y-2.5 max-h-52 overflow-y-auto">
+                <div v-if="state.mcpServers.length === 0" class="text-[11px] text-slate-400 py-3 text-center">
+                  暂无可用的 MCP 服务器（列表为空或加载失败）
+                </div>
+                <div
+                  v-for="mcp in state.mcpServers"
+                  :key="mcp.id"
+                  class="space-y-1.5 border-b border-slate-100 last:border-0 pb-2.5 last:pb-0"
+                >
+                  <label class="flex items-center justify-between cursor-pointer text-slate-800 font-medium">
+                    <div class="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        :value="tool.id"
-                        v-model="form.boundTools"
-                        class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        :value="mcp.id"
+                        v-model="boundServerIds"
+                        class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                      <div class="min-w-0 flex-1">
-                        <div class="font-mono font-bold text-slate-800 text-xs">{{ tool.name }}</div>
-                        <div class="text-[10px] text-slate-400 line-clamp-1">{{ tool.description }}</div>
-                      </div>
-                    </label>
+                      <span class="text-xs font-semibold">{{ mcp.name }}</span>
+                    </div>
+                    <span
+                      class="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                      :class="mcp.status === 'connected' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/80' : 'bg-slate-100 text-slate-400'"
+                    >
+                      {{ mcp.status === 'connected' ? '已启用' : '已停用' }}
+                    </span>
+                  </label>
+                  <div v-if="boundServerIds.includes(mcp.id)" class="pl-6 pr-1">
+                    <input
+                      :value="toolsWhitelistInput(mcp.id)"
+                      @input="updateToolsWhitelist(mcp.id, ($event.target as HTMLInputElement).value)"
+                      type="text"
+                      :placeholder="`工具白名单，如：pg_query, pg_schema（留空 = 全部工具）`"
+                      class="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono transition-all"
+                    />
                   </div>
                 </div>
               </div>
@@ -231,7 +246,7 @@
 import { ref, computed, watch } from 'vue';
 import { Bot, X } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { Agent, AgentType } from '../../types';
+import { Agent, AgentType, AgentMcpBinding } from '../../types';
 
 const { state, addAgent, updateAgent, hasPermission } = useAppStore();
 
@@ -241,45 +256,82 @@ const form = ref({
   name: '',
   description: '',
   type: 'ReAct' as AgentType,
-  llmProviderId: 'llm-1',
-  llmProviderName: '智谱 GLM-4',
+  llmProviderId: 'zhipu',
+  llmProviderName: '智谱 BigModel',
   model: 'glm-4-flash',
   temperature: 0.7,
   maxTokens: 2000,
   systemPrompt: '',
   boundTools: [] as string[],
+  mcpBindings: [] as AgentMcpBinding[],
   timeout: 60,
   maxRetries: 3,
   retryBackoffMs: 1000,
   isPublic: true,
 });
 
+/** 当前勾选绑定的 MCP 服务器 ID 列表（checkbox v-model） */
+const boundServerIds = ref<string[]>([]);
+
+/** 编辑回显：把 Agent.mcpBindings 同步到勾选列表与白名单输入 */
 watch(
   () => state.editingAgent,
   (newVal) => {
     if (newVal) {
-      form.value = { ...newVal };
+      form.value = {
+        ...newVal,
+        mcpBindings: newVal.mcpBindings ? [...newVal.mcpBindings] : [],
+        boundTools: newVal.boundTools ? [...newVal.boundTools] : [],
+      };
+      boundServerIds.value = (newVal.mcpBindings || []).map((b) => b.mcpServerId);
     } else {
       form.value = {
         name: '',
         description: '',
         type: 'ReAct',
-        llmProviderId: 'llm-1',
-        llmProviderName: '智谱 GLM-4',
+        llmProviderId: 'zhipu',
+        llmProviderName: '智谱 BigModel',
         model: 'glm-4-flash',
         temperature: 0.7,
         maxTokens: 2000,
         systemPrompt: '',
         boundTools: [],
+        mcpBindings: [],
         timeout: 60,
         maxRetries: 3,
         retryBackoffMs: 1000,
         isPublic: true,
       };
+      boundServerIds.value = [];
     }
   },
   { immediate: true }
 );
+
+/** 读取某 MCP 的白名单输入值（逗号分隔字符串） */
+function toolsWhitelistInput(mcpServerId: string): string {
+  const binding = form.value.mcpBindings.find((b) => b.mcpServerId === mcpServerId);
+  return binding ? binding.enabledTools.join(', ') : '';
+}
+
+/** 白名单输入变更：解析逗号分隔的工具名并写入 form.mcpBindings */
+function updateToolsWhitelist(mcpServerId: string, raw: string) {
+  const tools = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const existing = form.value.mcpBindings.find((b) => b.mcpServerId === mcpServerId);
+  if (existing) {
+    existing.enabledTools = tools;
+  } else {
+    const mcp = state.mcpServers.find((m) => m.id === mcpServerId);
+    form.value.mcpBindings.push({
+      mcpServerId,
+      mcpServerName: mcp?.name || '',
+      enabledTools: tools,
+    });
+  }
+}
 
 const currentSupportedModels = computed(() => {
   const p = state.llmProviders.find((x) => x.id === form.value.llmProviderId);
@@ -299,14 +351,27 @@ function closeDrawer() {
   state.editingAgent = null;
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!form.value.name || !form.value.systemPrompt) {
     return;
   }
+  // 同步勾选的 MCP 到绑定列表（取消勾选 = 移除绑定）
+  form.value.mcpBindings = boundServerIds.value.map((id) => {
+    const existing = form.value.mcpBindings.find((b) => b.mcpServerId === id);
+    const mcp = state.mcpServers.find((m) => m.id === id);
+    return {
+      mcpServerId: id,
+      mcpServerName: existing?.mcpServerName || mcp?.name || '',
+      enabledTools: existing?.enabledTools || [],
+    };
+  });
+  // 派生扁平工具列表
+  form.value.boundTools = form.value.mcpBindings.flatMap((b) => b.enabledTools);
+
   if (isEdit.value && state.editingAgent) {
-    updateAgent(state.editingAgent.id, form.value);
+    await updateAgent(state.editingAgent.id, form.value);
   } else {
-    addAgent(form.value);
+    await addAgent(form.value);
   }
   closeDrawer();
 }

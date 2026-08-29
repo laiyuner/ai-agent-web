@@ -211,7 +211,14 @@ export const INITIAL_AGENTS: Agent[] = [
     temperature: 0.2,
     maxTokens: 2500,
     systemPrompt: '你是一名资深全栈架构师。请对输入的代码 Diff 进行深度审查。输出结构包含：1. 潜在的安全漏洞 2. 性能改进建议 3. 命名与规范建议。利用 GitHub MCP 读取项目背景。',
-    boundTools: ['t-1', 't-3'],
+    boundTools: ['read_file', 'list_commits'],
+    mcpBindings: [
+      {
+        mcpServerId: 'mcp-1',
+        mcpServerName: 'GitHub Enterprise MCP Server',
+        enabledTools: ['read_file', 'list_commits'],
+      },
+    ],
     timeout: 60,
     maxRetries: 3,
     retryBackoffMs: 1000,
@@ -230,7 +237,14 @@ export const INITIAL_AGENTS: Agent[] = [
     temperature: 0.1,
     maxTokens: 2000,
     systemPrompt: '你是精通 PostgreSQL 的数据库专家。请通过 get_table_schema 工具获取数据库结构，分析用户查询诉求并构造正确的 SELECT 语句，禁止执行 UPDATE/DELETE 命令。',
-    boundTools: ['t-4', 't-5'],
+    boundTools: ['get_table_schema', 'execute_readonly_sql'],
+    mcpBindings: [
+      {
+        mcpServerId: 'mcp-2',
+        mcpServerName: 'Postgres RDS Connector',
+        enabledTools: ['get_table_schema', 'execute_readonly_sql'],
+      },
+    ],
     timeout: 45,
     maxRetries: 3,
     retryBackoffMs: 1000,
@@ -249,7 +263,14 @@ export const INITIAL_AGENTS: Agent[] = [
     temperature: 0.5,
     maxTokens: 3000,
     systemPrompt: '你是一名科技科技媒体主编。利用 web_search 搜索最新的资讯，总结核心动向并剔除营销垃圾信息。',
-    boundTools: ['t-6', 't-7'],
+    boundTools: ['web_search', 'fetch_article'],
+    mcpBindings: [
+      {
+        mcpServerId: 'mcp-3',
+        mcpServerName: 'Tavily Web Search MCP Engine',
+        enabledTools: ['web_search', 'fetch_article'],
+      },
+    ],
     timeout: 90,
     maxRetries: 2,
     retryBackoffMs: 2000,
@@ -268,7 +289,14 @@ export const INITIAL_AGENTS: Agent[] = [
     temperature: 0.3,
     maxTokens: 1500,
     systemPrompt: '提取错误堆栈的核心特征，分类为前端/后端/DB类型，并在 GitHub 上自动创建 Issue 描述。',
-    boundTools: ['t-2'],
+    boundTools: ['create_issue'],
+    mcpBindings: [
+      {
+        mcpServerId: 'mcp-1',
+        mcpServerName: 'GitHub Enterprise MCP Server',
+        enabledTools: ['create_issue'],
+      },
+    ],
     timeout: 30,
     maxRetries: 3,
     retryBackoffMs: 1000,

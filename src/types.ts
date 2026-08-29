@@ -57,7 +57,7 @@ export interface Agent {
   /** @deprecated 由 mcpBindings 派生的扁平工具名列表，仅用于旧展示点 */
   boundTools: string[];
   /** MCP 服务器绑定列表（编辑回显与提交的权威数据源） */
-  mcpBindings?: AgentMcpBinding[];
+  mcpBindings: AgentMcpBinding[];
   timeout: number;
   maxRetries: number;
   retryBackoffMs: number;
