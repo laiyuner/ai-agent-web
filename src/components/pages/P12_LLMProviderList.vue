@@ -26,18 +26,21 @@
     </div>
 
     <!-- Filter & Search Toolbar -->
-    <div class="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
-      <!-- Category Tabs -->
-      <div class="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-full sm:w-auto">
+    <div class="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      <!-- Category Tabs (Segmented Tab Controls) -->
+      <div class="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl w-full sm:w-auto">
         <button
           v-for="tab in filterTabs"
           :key="tab.id"
           @click="activeFilter = tab.id"
-          class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-none text-center"
-          :class="activeFilter === tab.id ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+          class="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-none btn-tactile select-none"
+          :class="activeFilter === tab.id ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'"
         >
-          {{ tab.label }}
-          <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full" :class="activeFilter === tab.id ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-600'">
+          <span>{{ tab.label }}</span>
+          <span
+            class="text-[10px] px-1.5 py-0.2 rounded-full font-mono"
+            :class="activeFilter === tab.id ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-200/70 text-slate-500'"
+          >
             {{ getCountByFilter(tab.id) }}
           </span>
         </button>
@@ -60,16 +63,16 @@
       <div
         v-for="p in filteredProviders"
         :key="p.id"
-        class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs flex flex-col justify-between space-y-5 min-w-0 transition-all hover:shadow-md hover:border-slate-300"
+        class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs flex flex-col justify-between space-y-5 min-w-0 card-elevated hover:border-indigo-200"
       >
         <!-- Card Top Section -->
-        <div class="space-y-4 min-w-0">
+        <div class="space-y-4 min-w-0 flex-1 flex flex-col">
           <!-- Card Header: Provider Icon, Name, Status, and Test Button -->
           <div class="flex items-start justify-between gap-3 min-w-0">
             <div class="flex items-center gap-3 min-w-0 flex-1">
               <!-- Brand Badge Icon -->
               <div
-                class="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 border"
+                class="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 border shadow-2xs"
                 :class="getBrandStyle(p.code).bgClass"
               >
                 <component :is="getBrandStyle(p.code).icon" class="w-5 h-5" :class="getBrandStyle(p.code).textClass" />
@@ -85,7 +88,7 @@
 
                 <div class="flex items-center gap-2 mt-1">
                   <span
-                    class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap shrink-0"
+                    class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0"
                     :class="
                       p.status === 'configured'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
@@ -96,7 +99,7 @@
                     {{ p.status === 'configured' ? '已配置 Key' : '未设置密钥' }}
                   </span>
 
-                  <span class="text-[11px] text-slate-400 font-medium truncate">
+                  <span class="text-[11px] text-slate-400 font-medium truncate font-mono">
                     {{ p.isBuiltIn ? '原生内置' : '自定义拓展' }}
                   </span>
                 </div>
@@ -108,7 +111,7 @@
               v-if="hasPermission('llm_provider:test')"
               @click="testLlmProvider(p.id)"
               title="测试 Endpoint 握手连通性与响应延时"
-              class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs shrink-0 mt-0.5"
+              class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs shrink-0 mt-0.5 btn-tactile"
             >
               <Activity class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
               <span>测试</span>
@@ -132,7 +135,7 @@
 
               <button
                 @click="copyToClipboard(p.baseUrl)"
-                class="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-white transition-colors shrink-0 cursor-pointer"
+                class="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-white transition-colors shrink-0 cursor-pointer btn-tactile"
                 title="复制 Base URL"
               >
                 <Copy class="w-3.5 h-3.5" />
@@ -141,7 +144,7 @@
           </div>
 
           <!-- Supported Models List Section -->
-          <div class="space-y-2 min-w-0">
+          <div class="space-y-2 min-w-0 mt-auto">
             <div class="flex items-center justify-between">
               <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">支持模型 ({{ p.supportedModels.length }})</span>
               
@@ -149,20 +152,20 @@
               <button
                 v-if="hasPermission('llm_provider:update')"
                 @click="promptAddModel(p.id)"
-                class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer"
+                class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer btn-tactile"
               >
                 <Plus class="w-3 h-3" />
                 <span>挂载模型</span>
               </button>
             </div>
 
-            <div class="flex flex-wrap gap-1.5 min-w-0 max-h-32 overflow-y-auto scrollbar-thin pr-1">
+            <div class="flex flex-wrap gap-1.5 min-w-0 max-h-32 overflow-y-auto pr-1">
               <div
                 v-for="m in p.supportedModels"
                 :key="m"
                 @click="setDefaultModel(p.id, m)"
                 title="点击设置为当前供应商的默认全局模型"
-                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg font-mono transition-all cursor-pointer border min-w-0 max-w-[200px]"
+                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg font-mono transition-all cursor-pointer border min-w-0 max-w-[200px] btn-tactile select-none"
                 :class="
                   m === p.defaultModel
                     ? 'bg-indigo-50 text-indigo-700 font-bold border-indigo-200 shadow-2xs'
@@ -181,7 +184,7 @@
         <div class="pt-4 border-t border-slate-100 space-y-2.5 min-w-0">
           <div class="flex items-center justify-between">
             <label class="block text-xs font-bold text-slate-800">设置 / 切换 API Key</label>
-            <span class="text-[11px] text-slate-400">
+            <span class="text-[11px] text-slate-400 font-mono">
               {{ p.apiKeyConfigured ? '密钥掩码已上锁' : '暂无配置密钥' }}
             </span>
           </div>
@@ -208,7 +211,7 @@
             <button
               v-if="hasPermission('llm_provider:update')"
               @click="saveKey(p.id)"
-              class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors shrink-0 shadow-2xs cursor-pointer"
+              class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors shrink-0 shadow-2xs cursor-pointer btn-tactile"
             >
               更新
             </button>

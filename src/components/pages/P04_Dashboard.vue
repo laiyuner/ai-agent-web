@@ -18,14 +18,14 @@
       <div class="mt-5 flex flex-wrap gap-3 z-10 relative">
         <button
           @click="openNewWorkflowCanvas"
-          class="bg-white text-slate-900 hover:bg-slate-100 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
+          class="bg-white text-slate-900 hover:bg-slate-100 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer btn-tactile"
         >
           <Plus class="w-4 h-4" />
           <span>新建可视化 DAG 工作流</span>
         </button>
         <button
           @click="setRoute('agents')"
-          class="bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer"
+          class="bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 cursor-pointer btn-tactile"
         >
           <Bot class="w-4 h-4 text-indigo-400" />
           <span>管理 Agent 智能体池</span>
@@ -38,7 +38,7 @@
       <div
         v-for="card in statCards"
         :key="card.title"
-        class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex items-start justify-between cursor-pointer group"
+        class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs card-elevated flex items-start justify-between cursor-pointer group"
         @click="setRoute(card.route)"
       >
         <div class="space-y-1.5">
@@ -58,7 +58,7 @@
     <!-- Main Content Area: Full Responsive Grid Layout -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       <!-- Left Main Column: Workflows (lg:col-span-8) -->
-      <div class="lg:col-span-8 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-5">
+      <div class="lg:col-span-8 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-5">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5">
             <GitFork class="w-5 h-5 text-indigo-600" />
@@ -66,7 +66,7 @@
           </div>
           <button
             @click="setRoute('workflows')"
-            class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs"
+            class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs btn-tactile"
           >
             <span>查看全部 ({{ state.workflows.length }})</span>
             <ArrowRight class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -86,7 +86,7 @@
             v-else
             v-for="wf in state.workflows"
             :key="wf.id"
-            class="p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/40 hover:bg-white transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs"
+            class="p-5 rounded-2xl border border-slate-200/80 hover:border-slate-300 bg-slate-50/40 hover:bg-white transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs card-elevated"
           >
             <div class="space-y-2 flex-1">
               <div class="flex items-center gap-2.5">
@@ -109,13 +109,13 @@
             <div class="flex items-center gap-2.5 shrink-0 self-end md:self-center">
               <button
                 @click="openEdit(wf.id)"
-                class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs sm:text-sm text-slate-800 font-semibold transition-colors"
+                class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs sm:text-sm text-slate-800 font-semibold transition-colors cursor-pointer btn-tactile"
               >
                 画布编辑
               </button>
               <button
                 @click="openRunDialog(wf)"
-                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5"
+                class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer btn-tactile"
               >
                 <Play class="w-4 h-4 fill-current" />
                 <span>立即调度</span>
@@ -128,7 +128,7 @@
       <!-- Right Column: Live Executions & MCP Servers (lg:col-span-4) -->
       <div class="lg:col-span-4 space-y-6">
         <!-- Recent Run Logs -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <Activity class="w-5 h-5 text-emerald-600" />
@@ -136,7 +136,7 @@
             </div>
             <button
               @click="setRoute('runs')"
-              class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs"
+              class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs btn-tactile"
             >
               <span>全量历史</span>
               <ArrowRight class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />

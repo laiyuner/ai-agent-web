@@ -24,88 +24,97 @@
 
     <div class="flex items-center gap-3">
       <!-- Screen Display Scaling Selector -->
-      <div class="relative">
+      <div ref="scaleDropdownRef" class="relative">
         <button
-          @click="showScaleDropdown = !showScaleDropdown; showDropdown = false"
+          @click.stop="showScaleDropdown = !showScaleDropdown; showDropdown = false"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
           title="点击根据 17 英寸/2K 显示屏调整视觉比例与缩放"
         >
           <Monitor class="w-3.5 h-3.5 text-indigo-600" />
           <span class="hidden md:inline">{{ displayModeLabel }}</span>
-          <ChevronDown class="w-3 h-3 text-slate-400" />
+          <ChevronDown class="w-3 h-3 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': showScaleDropdown }" />
         </button>
 
-        <div
-          v-if="showScaleDropdown"
-          class="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 z-50 text-xs space-y-1 animate-in fade-in duration-150"
+        <Transition
+          enter-active-class="transition ease-out duration-150"
+          enter-from-class="opacity-0 translate-y-1 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition ease-in duration-100"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 translate-y-1 scale-95"
         >
-          <div class="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            屏幕尺寸与显示比例:
-          </div>
-
-          <button
-            @click="selectDisplayMode('auto')"
-            class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
-            :class="state.displayMode === 'auto' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+          <div
+            v-if="showScaleDropdown"
+            class="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 z-50 text-xs space-y-1 origin-top-right"
           >
-            <div>
-              <div class="font-bold flex items-center gap-1.5">
-                <span>🤖 智能感知 (17"屏优选)</span>
-                <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded font-bold">推荐</span>
+            <div class="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              屏幕尺寸与显示比例:
+            </div>
+
+            <button
+              @click="selectDisplayMode('auto')"
+              class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
+              :class="state.displayMode === 'auto' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+            >
+              <div>
+                <div class="font-bold flex items-center gap-1.5">
+                  <span>🤖 智能感知 (17"屏优选)</span>
+                  <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded font-bold">推荐</span>
+                </div>
+                <p class="text-[10px] text-slate-400 font-normal">自动适应大屏基准字号与宽度</p>
               </div>
-              <p class="text-[10px] text-slate-400 font-normal">自动适应大屏基准字号与宽度</p>
-            </div>
-            <Check v-if="state.displayMode === 'auto'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          </button>
+              <Check v-if="state.displayMode === 'auto'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            </button>
 
-          <button
-            @click="selectDisplayMode('110')"
-            class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
-            :class="state.displayMode === '110' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
-          >
-            <div>
-              <div class="font-bold">🖥️ 110% 舒展大屏</div>
-              <p class="text-[10px] text-slate-400 font-normal">专为 17 英寸笔记本/2K 显示器设计</p>
-            </div>
-            <Check v-if="state.displayMode === '110'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          </button>
+            <button
+              @click="selectDisplayMode('110')"
+              class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
+              :class="state.displayMode === '110' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+            >
+              <div>
+                <div class="font-bold">🖥️ 110% 舒展大屏</div>
+                <p class="text-[10px] text-slate-400 font-normal">专为 17 英寸笔记本/2K 显示器设计</p>
+              </div>
+              <Check v-if="state.displayMode === '110'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            </button>
 
-          <button
-            @click="selectDisplayMode('100')"
-            class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
-            :class="state.displayMode === '100' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
-          >
-            <div>
-              <div class="font-bold">💻 100% 标准基准</div>
-              <p class="text-[10px] text-slate-400 font-normal">适合 13-15 英寸便携本</p>
-            </div>
-            <Check v-if="state.displayMode === '100'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          </button>
+            <button
+              @click="selectDisplayMode('100')"
+              class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
+              :class="state.displayMode === '100' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+            >
+              <div>
+                <div class="font-bold">💻 100% 标准基准</div>
+                <p class="text-[10px] text-slate-400 font-normal">适合 13-15 英寸便携本</p>
+              </div>
+              <Check v-if="state.displayMode === '100'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            </button>
 
-          <button
-            @click="selectDisplayMode('125')"
-            class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
-            :class="state.displayMode === '125' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
-          >
-            <div>
-              <div class="font-bold">📺 125% 广角特大</div>
-              <p class="text-[10px] text-slate-400 font-normal">4K 高分屏/远距离展示场景</p>
-            </div>
-            <Check v-if="state.displayMode === '125'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          </button>
+            <button
+              @click="selectDisplayMode('125')"
+              class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
+              :class="state.displayMode === '125' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+            >
+              <div>
+                <div class="font-bold">📺 125% 广角特大</div>
+                <p class="text-[10px] text-slate-400 font-normal">4K 高分屏/远距离展示场景</p>
+              </div>
+              <Check v-if="state.displayMode === '125'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            </button>
 
-          <button
-            @click="selectDisplayMode('90')"
-            class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
-            :class="state.displayMode === '90' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
-          >
-            <div>
-              <div class="font-bold">📱 92% 高密度紧凑</div>
-              <p class="text-[10px] text-slate-400 font-normal">同屏平铺更多密集监控图表</p>
-            </div>
-            <Check v-if="state.displayMode === '90'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-          </button>
-        </div>
+            <button
+              @click="selectDisplayMode('90')"
+              class="w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer"
+              :class="state.displayMode === '90' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-50 text-slate-700'"
+            >
+              <div>
+                <div class="font-bold">📱 92% 高密度紧凑</div>
+                <p class="text-[10px] text-slate-400 font-normal">同屏平铺更多密集监控图表</p>
+              </div>
+              <Check v-if="state.displayMode === '90'" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            </button>
+          </div>
+        </Transition>
       </div>
 
       <!-- Quick Route Actions -->
@@ -119,9 +128,9 @@
       </button>
 
       <!-- Account Switcher Dropdown -->
-      <div class="relative">
+      <div ref="userDropdownRef" class="relative">
         <button
-          @click="showDropdown = !showDropdown; showScaleDropdown = false"
+          @click.stop="showDropdown = !showDropdown; showScaleDropdown = false"
           class="flex items-center gap-2.5 p-1.5 pl-2.5 pr-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-xs font-medium cursor-pointer"
         >
           <img
@@ -141,100 +150,148 @@
             </div>
             <div class="text-[11px] text-slate-400 font-mono">@{{ state.currentUser?.username }}</div>
           </div>
-          <ChevronDown class="w-4 h-4 text-slate-400 ml-1" />
+          <ChevronDown class="w-4 h-4 text-slate-400 ml-1 transition-transform duration-200" :class="{ 'rotate-180': showDropdown }" />
         </button>
 
         <!-- Dropdown Menu -->
-        <div
-          v-if="showDropdown"
-          class="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 text-xs space-y-2"
+        <Transition
+          enter-active-class="transition ease-out duration-150"
+          enter-from-class="opacity-0 translate-y-1 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition ease-in duration-100"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 translate-y-1 scale-95"
         >
-          <div class="p-2.5 bg-slate-50 rounded-xl space-y-1">
-            <div class="font-bold text-slate-900 text-sm">{{ state.currentUser?.displayName }}</div>
-            <div class="text-xs text-slate-500 font-mono">{{ state.currentUser?.email }}</div>
-            <div class="pt-1 flex items-center justify-between">
-              <span
-                class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full"
-                :class="
-                  state.currentUser?.role === 'ADMIN'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : state.currentUser?.role === 'DEVELOPER'
-                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                    : 'bg-slate-100 text-slate-700 border border-slate-200'
-                "
-              >
-                {{
-                  state.currentUser?.role === 'ADMIN'
-                    ? '超级管理员'
-                    : state.currentUser?.role === 'DEVELOPER'
-                    ? '开发者'
-                    : '审计访客'
-                }}
-              </span>
+          <div
+            v-if="showDropdown"
+            class="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 text-xs space-y-2 origin-top-right"
+          >
+            <div class="p-2.5 bg-slate-50 rounded-xl space-y-1">
+              <div class="font-bold text-slate-900 text-sm">{{ state.currentUser?.displayName }}</div>
+              <div class="text-xs text-slate-500 font-mono">{{ state.currentUser?.email }}</div>
+              <div class="pt-1 flex items-center justify-between">
+                <span
+                  class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                  :class="
+                    state.currentUser?.role === 'ADMIN'
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                      : state.currentUser?.role === 'DEVELOPER'
+                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                  "
+                >
+                  {{
+                    state.currentUser?.role === 'ADMIN'
+                      ? '超级管理员'
+                      : state.currentUser?.role === 'DEVELOPER'
+                      ? '开发者'
+                      : '审计访客'
+                  }}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <!-- Quick Role Switcher for RBAC Testing -->
-          <div class="pt-2 border-t border-slate-100">
-            <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              角色权限测试切换 (RBAC)
+            <!-- Quick Role Switcher for RBAC Testing -->
+            <div class="pt-2 border-t border-slate-100">
+              <div class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                角色权限测试切换 (RBAC)
+              </div>
+              <div class="grid grid-cols-3 gap-1 mt-1">
+                <button
+                  @click="switchRoleForTesting('ADMIN')"
+                  class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                  :class="state.currentUser?.role === 'ADMIN' ? 'bg-rose-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                >
+                  管理员
+                </button>
+                <button
+                  @click="switchRoleForTesting('DEVELOPER')"
+                  class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                  :class="state.currentUser?.role === 'DEVELOPER' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                >
+                  开发者
+                </button>
+                <button
+                  @click="switchRoleForTesting('VIEWER')"
+                  class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                  :class="state.currentUser?.role === 'VIEWER' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                >
+                  访客(只读)
+                </button>
+              </div>
             </div>
-            <div class="grid grid-cols-3 gap-1 mt-1">
+
+            <div class="pt-2 border-t border-slate-100 space-y-1">
               <button
-                @click="switchRoleForTesting('ADMIN')"
-                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
-                :class="state.currentUser?.role === 'ADMIN' ? 'bg-rose-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                @click="goToProfile"
+                class="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-medium text-xs text-left transition-colors cursor-pointer"
               >
-                管理员
+                <UserIcon class="w-4 h-4 text-slate-500" />
+                <span>个人中心与账号设置</span>
               </button>
               <button
-                @click="switchRoleForTesting('DEVELOPER')"
-                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
-                :class="state.currentUser?.role === 'DEVELOPER' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                @click="handleLogout"
+                class="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl hover:bg-rose-50 text-rose-600 font-medium text-xs text-left transition-colors cursor-pointer"
               >
-                开发者
-              </button>
-              <button
-                @click="switchRoleForTesting('VIEWER')"
-                class="px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
-                :class="state.currentUser?.role === 'VIEWER' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-              >
-                访客(只读)
+                <LogOut class="w-4 h-4 text-rose-500" />
+                <span>退出系统</span>
               </button>
             </div>
           </div>
-
-
-          <div class="pt-2 border-t border-slate-100 space-y-1">
-            <button
-              @click="goToProfile"
-              class="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl hover:bg-slate-100 text-slate-800 font-medium text-xs text-left transition-colors cursor-pointer"
-            >
-              <UserIcon class="w-4 h-4 text-slate-500" />
-              <span>个人中心与账号设置</span>
-            </button>
-            <button
-              @click="handleLogout"
-              class="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-xl hover:bg-rose-50 text-rose-600 font-medium text-xs text-left transition-colors cursor-pointer"
-            >
-              <LogOut class="w-4 h-4 text-rose-500" />
-              <span>退出系统</span>
-            </button>
-          </div>
-        </div>
+        </Transition>
       </div>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Plus, ChevronDown, User as UserIcon, LogOut, Monitor, Check } from 'lucide-vue-next';
 import { useAppStore, DisplayMode } from '../../stores/useAppStore';
 
 const { state, setRoute, setDisplayMode, logout, addToast, hasPermission } = useAppStore();
 const showDropdown = ref(false);
 const showScaleDropdown = ref(false);
+const userDropdownRef = ref<HTMLElement | null>(null);
+const scaleDropdownRef = ref<HTMLElement | null>(null);
+
+function handleClickOutside(event: MouseEvent | PointerEvent) {
+  const target = event.target as Node | null;
+  if (!target) return;
+
+  if (showDropdown.value && userDropdownRef.value && !userDropdownRef.value.contains(target)) {
+    showDropdown.value = false;
+  }
+  if (showScaleDropdown.value && scaleDropdownRef.value && !scaleDropdownRef.value.contains(target)) {
+    showScaleDropdown.value = false;
+  }
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    showDropdown.value = false;
+    showScaleDropdown.value = false;
+  }
+}
+
+// Automatically close any open dropdown menu whenever the route changes (e.g. clicking sidebar menu items)
+watch(
+  () => state.route,
+  () => {
+    showDropdown.value = false;
+    showScaleDropdown.value = false;
+  }
+);
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleClickOutside, true);
+  document.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', handleClickOutside, true);
+  document.removeEventListener('keydown', handleKeydown);
+});
 
 function switchRoleForTesting(newRole: 'ADMIN' | 'DEVELOPER' | 'VIEWER') {
   if (!state.currentUser) {

@@ -27,18 +27,18 @@
       <div
         v-for="mcp in state.mcpServers"
         :key="mcp.id"
-        class="bg-white rounded-3xl border border-slate-200 hover:border-slate-400 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-5"
+        class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs hover:border-indigo-200 card-elevated flex flex-col justify-between gap-5 group"
       >
-        <div class="space-y-3.5">
+        <div class="space-y-3.5 flex-1 flex flex-col">
           <div class="flex items-start justify-between gap-2">
-            <div class="space-y-1.5">
+            <div class="space-y-1.5 flex-1 min-w-0">
               <div class="flex items-center gap-2.5">
-                <span class="font-bold text-slate-900 text-base sm:text-lg">{{ mcp.name }}</span>
+                <span class="font-bold text-slate-900 text-base sm:text-lg truncate group-hover:text-indigo-600 transition-colors" :title="mcp.name">{{ mcp.name }}</span>
                 <span
-                  class="text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1.5"
-                  :class="mcp.status === 'connected' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'"
+                  class="text-[11px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1.5 shrink-0"
+                  :class="mcp.status === 'connected' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : 'bg-rose-50 text-rose-700 border border-rose-200/80'"
                 >
-                  <span class="w-2 h-2 rounded-full" :class="mcp.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                  <span class="w-1.5 h-1.5 rounded-full" :class="mcp.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
                   <span>{{ mcp.status === 'connected' ? '已握手' : '断开' }}</span>
                 </span>
               </div>
@@ -47,12 +47,12 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 v-if="hasPermission('mcp_server:test')"
                 @click="testMcpServer(mcp.id)"
                 title="探针连通测试"
-                class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                class="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer btn-tactile"
               >
                 <Activity class="w-4 h-4" />
               </button>
@@ -61,38 +61,38 @@
                 v-if="hasPermission('mcp_server:delete')"
                 @click="deleteMcpServer(mcp.id)"
                 title="移除"
-                class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer btn-tactile"
               >
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
+          <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed min-h-[40px] flex-1">
             {{ mcp.description }}
           </p>
 
           <!-- Stdio / SSE Details -->
-          <div class="p-3.5 bg-slate-950 text-slate-200 rounded-2xl font-mono text-xs space-y-1">
+          <div class="p-3.5 bg-slate-950 text-slate-200 rounded-2xl font-mono text-xs space-y-1 shadow-inner">
             <div class="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">通讯句柄接口</div>
-            <div v-if="mcp.transportType === 'stdio'" class="text-indigo-300 truncate">
+            <div v-if="mcp.transportType === 'stdio'" class="text-indigo-300 truncate text-[11px]">
               $ {{ mcp.command }} {{ (mcp.args || []).join(' ') }}
             </div>
-            <div v-else class="text-emerald-300 truncate">
+            <div v-else class="text-emerald-300 truncate text-[11px]">
               SSE Endpoint: {{ mcp.sseUrl }}
             </div>
           </div>
 
           <!-- Tools List -->
-          <div class="space-y-2">
-            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">导出的 MCP 工具 ({{ mcp.toolsCount }})</div>
-            <div class="flex flex-wrap gap-2">
+          <div class="space-y-2 mt-auto">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">导出的 MCP 工具 ({{ mcp.toolsCount }})</div>
+            <div class="flex flex-wrap gap-1.5">
               <span
                 v-for="t in mcp.tools"
                 :key="t.id"
-                class="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200/90 flex items-center gap-1.5"
+                class="text-[11px] px-2.5 py-0.5 rounded-lg bg-slate-100/80 text-slate-800 font-semibold border border-slate-200/80 flex items-center gap-1.5"
               >
-                <Zap class="w-3.5 h-3.5 text-amber-500" />
+                <Zap class="w-3 h-3 text-amber-500" />
                 <span>{{ t.name }}</span>
               </span>
             </div>
@@ -101,10 +101,10 @@
 
         <!-- Footer -->
         <div class="pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
-          <span>更新于: {{ mcp.updatedAt }}</span>
+          <span class="text-xs text-slate-400">更新于: {{ mcp.updatedAt }}</span>
           <button
             @click="openEditDrawer(mcp)"
-            class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-colors cursor-pointer"
+            class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl transition-colors cursor-pointer btn-tactile"
           >
             {{ hasPermission('mcp_server:update') ? '编辑参数' : '查看参数' }}
           </button>

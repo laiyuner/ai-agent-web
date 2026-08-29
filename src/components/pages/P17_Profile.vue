@@ -12,23 +12,32 @@
     </div>
 
     <!-- User Card -->
-    <div class="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xs space-y-6">
+    <div class="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-2xs space-y-6 card-elevated">
       <div class="flex items-center gap-5 pb-6 border-b border-slate-100">
         <img
           v-if="state.currentUser?.avatar"
           :src="state.currentUser.avatar"
-          class="w-20 h-20 rounded-3xl object-cover shadow-xs border border-slate-200"
+          class="w-20 h-20 rounded-3xl object-cover shadow-2xs border border-slate-200"
         />
-        <div v-else class="w-20 h-20 rounded-3xl bg-slate-900 text-white flex items-center justify-center font-extrabold text-2xl shadow-xs">
+        <div v-else class="w-20 h-20 rounded-3xl bg-slate-900 text-white flex items-center justify-center font-extrabold text-2xl shadow-2xs">
           {{ state.currentUser?.username.slice(0, 1).toUpperCase() }}
         </div>
 
         <div class="space-y-1.5">
-          <h3 class="text-lg sm:text-xl font-bold text-slate-900">{{ state.currentUser?.displayName }}</h3>
+          <h3 class="text-lg sm:text-xl font-bold text-slate-900 leading-tight">{{ state.currentUser?.displayName }}</h3>
           <div class="text-xs sm:text-sm text-slate-500 font-mono">@{{ state.currentUser?.username }} · {{ state.currentUser?.email }}</div>
           <div class="pt-1">
-            <span class="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-200">
-              {{ state.currentUser?.role }} 权限组
+            <span
+              class="text-xs font-bold px-3 py-1 rounded-full border inline-flex items-center gap-1.5"
+              :class="
+                state.currentUser?.role === 'ADMIN'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                  : state.currentUser?.role === 'DEVELOPER'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+                  : 'bg-slate-100 text-slate-700 border-slate-200/80'
+              "
+            >
+              {{ state.currentUser?.role === 'ADMIN' ? '超级管理员' : state.currentUser?.role === 'DEVELOPER' ? '开发者' : '审计访客' }} ({{ state.currentUser?.role }})
             </span>
           </div>
         </div>
@@ -42,7 +51,7 @@
             <input
               v-model="displayName"
               type="text"
-              class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             />
           </div>
 
@@ -51,7 +60,7 @@
             <input
               v-model="email"
               type="email"
-              class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono transition-all"
             />
           </div>
         </div>
@@ -62,14 +71,14 @@
             v-model="avatar"
             type="text"
             placeholder="https://..."
-            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+            class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono transition-all"
           />
         </div>
 
         <div class="pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
           <button
             @click="triggerPasswordReset"
-            class="text-xs sm:text-sm text-amber-800 font-bold bg-amber-50 hover:bg-amber-100 px-4 py-2.5 rounded-xl border border-amber-200 transition-colors flex items-center gap-2"
+            class="text-xs sm:text-sm text-amber-800 font-bold bg-amber-50 hover:bg-amber-100 px-4 py-2.5 rounded-xl border border-amber-200/80 transition-colors flex items-center gap-2 cursor-pointer btn-tactile"
           >
             <KeyRound class="w-4 h-4" />
             <span>手动触发初始密码重置弹窗</span>
@@ -77,7 +86,7 @@
 
           <button
             @click="handleSaveProfile"
-            class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all"
+            class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all cursor-pointer btn-tactile"
           >
             保存个人资料
           </button>

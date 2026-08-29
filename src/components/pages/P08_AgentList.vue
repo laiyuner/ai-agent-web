@@ -40,33 +40,33 @@
       <div
         v-for="ag in filteredAgents"
         :key="ag.id"
-        class="bg-white rounded-3xl border border-slate-200 hover:border-slate-400 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-5 group"
+        class="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs hover:border-indigo-200 card-elevated flex flex-col justify-between gap-5 group"
       >
-        <div class="space-y-3.5">
+        <div class="space-y-3.5 flex-1 flex flex-col">
           <div class="flex items-start justify-between gap-2">
-            <div class="flex items-center gap-3">
-              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 font-extrabold text-base">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100/80 font-extrabold text-base shadow-2xs">
                 {{ ag.name.slice(0, 1) }}
               </div>
-              <div>
-                <h3 class="font-bold text-slate-900 text-base sm:text-lg group-hover:text-indigo-600 transition-colors line-clamp-1">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-bold text-slate-900 text-base sm:text-lg group-hover:text-indigo-600 transition-colors line-clamp-1" :title="ag.name">
                   {{ ag.name }}
                 </h3>
                 <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5 font-mono">
-                  <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold border border-indigo-100">
+                  <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold border border-indigo-100/80 text-[10px]">
                     {{ ag.type }}
                   </span>
-                  <span>{{ ag.llmProviderName }} ({{ ag.model }})</span>
+                  <span class="truncate text-[11px]">{{ ag.llmProviderName }} ({{ ag.model }})</span>
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-1">
+            <div class="flex items-center gap-1 shrink-0">
               <button
                 v-if="hasPermission('agent:clone')"
                 @click="copyAgent(ag.id)"
                 title="克隆 Agent"
-                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer btn-tactile"
               >
                 <Copy class="w-4 h-4" />
               </button>
@@ -74,25 +74,25 @@
                 v-if="hasPermission('agent:delete')"
                 @click="deleteAgent(ag.id)"
                 title="移除"
-                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer btn-tactile"
               >
                 <Trash2 class="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed min-h-[40px]">
+          <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed min-h-[40px] flex-1">
             {{ ag.description }}
           </p>
 
           <!-- System Prompt Excerpt -->
-          <div class="p-3.5 rounded-2xl bg-slate-950 text-slate-200 space-y-1 font-mono text-xs">
+          <div class="p-3.5 rounded-2xl bg-slate-950 text-slate-200 space-y-1 font-mono text-xs shadow-inner">
             <div class="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider">System Prompt 角色指令</div>
-            <p class="line-clamp-2 text-slate-300 leading-snug">{{ ag.systemPrompt }}</p>
+            <p class="line-clamp-2 text-slate-300 leading-snug text-[11px]">{{ ag.systemPrompt }}</p>
           </div>
 
           <!-- Parameters Summary -->
-          <div class="grid grid-cols-3 gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 font-mono">
+          <div class="grid grid-cols-3 gap-2 text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100 font-mono tabular-nums">
             <div>
               <span class="block text-slate-400 text-[10px]">Temperature</span>
               <span class="font-bold text-slate-800">{{ ag.temperature }}</span>
@@ -113,7 +113,7 @@
           <span class="text-xs text-slate-400 font-mono">创建人: {{ ag.creator }}</span>
           <button
             @click="openEditDrawer(ag)"
-            class="px-4 py-2 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            class="px-4 py-2 text-xs sm:text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer btn-tactile"
           >
             <Sliders class="w-4 h-4" />
             <span>{{ hasPermission('agent:update') ? '配置 Agent' : '查看详情' }}</span>
