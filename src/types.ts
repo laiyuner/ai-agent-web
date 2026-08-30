@@ -171,6 +171,7 @@ export interface RunNodeState {
   inputJson: string;
   outputJson: string;
   error?: string;
+  startedAt?: string | null;
 }
 
 export interface RunRecord {

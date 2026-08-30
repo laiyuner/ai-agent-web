@@ -184,6 +184,10 @@
               <span>Tokens: {{ nodeTokens[node.nodeKey] || node.tokens || 0 }}</span>
             </div>
 
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span>开始: {{ formatNodeStartTime(node.startedAt) }}</span>
+            </div>
+
             <!-- Typewriter stream badge -->
             <div
               v-if="nodeOutputs[node.nodeKey]"
@@ -555,26 +559,61 @@ const selectedNodeKey = ref<string | null>(null);
 const selectedOutputNodeKey = ref<string | null>(null);
 const nodeOutputDisplayContainer = ref<HTMLDivElement | null>(null);
 
+// 按真实开始执行时间稳定排序：已开跑的节点按 startedAt 升序在前，
+// 未开跑的（PENDING/SKIPPED，startedAt 为空）沉底并保持原始相对顺序。
+// 仅在数据拉取时执行一次；WebSocket 状态更新不触发重排（startedAt 不可变，位置天然稳定）。
+function sortByExecutionOrder<T extends { startedAt?: string | null }>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const ta = a.startedAt ? new Date(a.startedAt).getTime() : null;
+    const tb = b.startedAt ? new Date(b.startedAt).getTime() : null;
+    if (ta === null && tb === null) return 0;   // 都未开跑：保持原序（sort 稳定）
+    if (ta === null) return 1;                   // 未开跑沉底
+    if (tb === null) return -1;
+    return ta - tb;
+  });
+}
+
+function formatNodeStartTime(startedAt?: string | null): string {
+  if (!startedAt) return '-';
+  try {
+    const d = new Date(startedAt);
+    if (!isNaN(d.getTime())) {
+      return d.toTimeString().slice(0, 8);
+    }
+    if (startedAt.includes('T')) {
+      return startedAt.split('T')[1].slice(0, 8);
+    }
+    if (startedAt.includes(' ')) {
+      return startedAt.split(' ')[1].slice(0, 8);
+    }
+    return startedAt.slice(0, 8);
+  } catch {
+    return '-';
+  }
+}
+
 // Computed list of nodes for UI
 const nodeList = computed(() => {
   if (!currentRun.value) return [];
   if (Array.isArray(currentRun.value.nodeStates) && currentRun.value.nodeStates.length > 0) {
-    return currentRun.value.nodeStates.map((ns: any) => ({
+    return sortByExecutionOrder(currentRun.value.nodeStates.map((ns: any) => ({
       nodeKey: ns.nodeId || ns.nodeKey || 'node-1',
       nodeName: ns.nodeName || ns.nodeKey || '节点',
       status: ns.status,
       durationMs: ns.durationMs,
       tokens: ns.tokens,
-    }));
+      startedAt: ns.startedAt || null,
+    })));
   }
   if (Array.isArray(currentRun.value.nodes)) {
-    return currentRun.value.nodes.map((n: any) => ({
+    return sortByExecutionOrder(currentRun.value.nodes.map((n: any) => ({
       nodeKey: n.nodeKey || String(n.id),
       nodeName: n.nodeName || n.nodeKey || '节点',
       status: n.status,
       durationMs: n.durationMs,
       tokens: n.tokens,
-    }));
+      startedAt: n.startedAt ?? null,
+    })));
   }
   // Fallback default node if empty
   return [
@@ -584,6 +623,7 @@ const nodeList = computed(() => {
       status: currentRun.value.status || 'PENDING',
       durationMs: currentRun.value.durationMs || 0,
       tokens: currentRun.value.tokensUsed || 0,
+      startedAt: currentRun.value.startedAt || null,
     },
   ];
 });

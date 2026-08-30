@@ -468,6 +468,9 @@ export function mapRunDtoToRunRecord(dto: any): RunRecord {
       status: (nr.status === 'SUCCESS' ? 'success' : nr.status === 'FAILED' ? 'failed' : nr.status === 'TERMINATED' ? 'terminated' : 'running') as any,
       durationMs: nr.finishedAt && nr.startedAt ? new Date(nr.finishedAt).getTime() - new Date(nr.startedAt).getTime() : 0,
       tokens: totalTokens,
+      // 节点真实开始执行时间（后端节点开跑时才写入；PENDING/SKIPPED 节点为 null），
+      // 用于监控页节点列表按执行顺序排序
+      startedAt: nr.startedAt || null,
       inputJson: nr.inputContext
         ? (typeof nr.inputContext === 'object'
            ? JSON.stringify(nr.inputContext, null, 2)
