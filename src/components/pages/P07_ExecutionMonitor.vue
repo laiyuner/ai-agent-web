@@ -460,26 +460,30 @@
             :class="isPanelExpanded ? 'h-[60vh]' : (getNodeStatus(selectedNodeKey) === 'RUNNING' ? 'h-64' : 'min-h-30 max-h-64')"
           >
             <!-- 输入分区：内容顶部锚定，独立内部滚动 -->
-            <div class="overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text">
-              <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeInput }}</pre>
+            <div
+              class="h-full min-h-0 min-w-0 max-h-64 md:max-h-full overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text"
+              :class="isPanelExpanded ? '!max-h-[60vh]' : ''"
+            >
+              <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text break-words">{{ currentSelectedNodeInput }}</pre>
             </div>
 
             <!-- 输出分区：内容顶部锚定，独立内部滚动（ref 供自动滚动 watch 使用） -->
             <div
               ref="outputContainer"
-              class="overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
+              class="h-full min-h-0 min-w-0 max-h-64 md:max-h-full overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
+              :class="isPanelExpanded ? '!max-h-[60vh]' : ''"
             >
               <!-- 渲染视图：Markdown → HTML（DOMPurify 已消毒） -->
               <div
                 v-if="isMarkdownView"
-                class="md-body text-xs"
+                class="md-body text-xs break-words"
                 v-html="renderedOutputHtml"
               ></div>
               <!-- 原文视图：打字机流式 -->
               <pre
                 v-else
                 v-memo="[currentSelectedNodeOutput, getNodeStatus(selectedNodeKey)]"
-                class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text"
+                class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text break-words"
               >{{ displayNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
             </div>
           </div>
@@ -934,7 +938,17 @@ const nodeList = computed(() => {
       startedAt: ns.startedAt || null,
     })));
   }
-  if (Array.isArray(currentRun.value.nodes)) {
+  if (Array.isArray(currentRun.value.nodeRuns) && currentRun.value.nodeRuns.length > 0) {
+    return sortByExecutionOrder(currentRun.value.nodeRuns.map((nr: any) => ({
+      nodeKey: nr.nodeKey || nr.nodeId || 'node-1',
+      nodeName: nr.nodeName || nr.nodeKey || '节点',
+      status: nr.status,
+      durationMs: nr.durationMs,
+      tokens: nr.tokens,
+      startedAt: nr.startedAt || null,
+    })));
+  }
+  if (Array.isArray(currentRun.value.nodes) && currentRun.value.nodes.length > 0) {
     return sortByExecutionOrder(currentRun.value.nodes.map((n: any) => ({
       nodeKey: n.nodeKey || String(n.id),
       nodeName: n.nodeName || n.nodeKey || '节点',
@@ -943,6 +957,16 @@ const nodeList = computed(() => {
       tokens: n.tokens,
       startedAt: n.startedAt ?? null,
     })));
+  }
+  if (workflowNodes.value.length > 0) {
+    return workflowNodes.value.map((n: any) => ({
+      nodeKey: String(n.id),
+      nodeName: n.data?.label || n.label || n.name || String(n.id),
+      status: nodeStatuses[String(n.id)] || 'PENDING',
+      durationMs: nodeDurations[String(n.id)] || 0,
+      tokens: nodeTokens[String(n.id)] || 0,
+      startedAt: null,
+    }));
   }
   // Fallback default node if empty
   return [
@@ -956,6 +980,31 @@ const nodeList = computed(() => {
     },
   ];
 });
+
+// 自动选中第一个节点（进入监控页时自动切换，无需手动点击）
+watch(
+  [() => nodeList.value, () => workflowNodes.value],
+  ([nodes, wfNodes]) => {
+    const validKeys = [
+      ...nodes.map(n => n.nodeKey),
+      ...wfNodes.map(n => String(n.id))
+    ].filter(k => k && k !== 'node-1');
+
+    if (validKeys.length === 0) {
+      if (!selectedNodeKey.value && nodes.length > 0) {
+        selectedNodeKey.value = nodes[0].nodeKey;
+      }
+      return;
+    }
+
+    // 若未选中、或选中的是占位符 node-1、或当前选中的 key 不在有效列表中，自动选首个节点或运行中节点
+    if (!selectedNodeKey.value || selectedNodeKey.value === 'node-1' || !validKeys.includes(selectedNodeKey.value)) {
+      const runningKey = validKeys.find(k => nodeStatuses[k] === 'RUNNING');
+      selectedNodeKey.value = runningKey || validKeys[0];
+    }
+  },
+  { immediate: true, deep: true }
+);
 
 const totalNodeCount = computed(() => {
   return currentRun.value?.totalNodes || nodeList.value.length || 1;
@@ -1080,18 +1129,56 @@ function extractInputText(raw: unknown): string {
 const currentSelectedNodeInput = computed(() => {
   if (!selectedNodeKey.value) return '';
   if (nodeInputs[selectedNodeKey.value]) return extractInputText(nodeInputs[selectedNodeKey.value]);
-  const found = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
-  if (found?.inputJson && found.inputJson !== '{}') return extractInputText(found.inputJson);
-  if (currentRun.value?.input) return extractInputText(currentRun.value.input);
-  if (found?.inputJson) return extractInputText(found.inputJson);
+
+  const foundState = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
+  if (foundState?.inputJson && foundState.inputJson !== '{}') return extractInputText(foundState.inputJson);
+  if (foundState?.input && foundState.input !== '{}') return extractInputText(foundState.input);
+
+  const foundRun = currentRun.value?.nodeRuns?.find((n: any) => (n.nodeKey || n.nodeId) === selectedNodeKey.value);
+  if (foundRun?.inputJson && foundRun.inputJson !== '{}') return extractInputText(foundRun.inputJson);
+  if (foundRun?.input && foundRun.input !== '{}') return extractInputText(foundRun.input);
+
+  const foundNode = currentRun.value?.nodes?.find((n: any) => (n.nodeKey || String(n.id)) === selectedNodeKey.value);
+  if (foundNode?.inputJson && foundNode.inputJson !== '{}') return extractInputText(foundNode.inputJson);
+  if (foundNode?.input && foundNode.input !== '{}') return extractInputText(foundNode.input);
+
+  // 若为首个节点且有整单输入，回退展示整单 input
+  if (currentRun.value?.input) {
+    const firstKey = nodeList.value[0]?.nodeKey || (workflowNodes.value[0] && String(workflowNodes.value[0].id));
+    if (firstKey === selectedNodeKey.value) {
+      return extractInputText(currentRun.value.input);
+    }
+  }
+
+  if (foundState?.inputJson) return extractInputText(foundState.inputJson);
   return '';
 });
 
 const currentSelectedNodeOutput = computed(() => {
   if (!selectedNodeKey.value) return '等待节点响应...';
   if (nodeOutputs[selectedNodeKey.value]) return nodeOutputs[selectedNodeKey.value];
-  const found = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
-  return found?.outputJson || currentRun.value?.output || '等待输出...';
+
+  const foundState = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
+  if (foundState?.outputJson) return typeof foundState.outputJson === 'object' ? JSON.stringify(foundState.outputJson, null, 2) : String(foundState.outputJson);
+  if (foundState?.output) return typeof foundState.output === 'object' ? JSON.stringify(foundState.output, null, 2) : String(foundState.output);
+
+  const foundRun = currentRun.value?.nodeRuns?.find((n: any) => (n.nodeKey || n.nodeId) === selectedNodeKey.value);
+  if (foundRun?.outputJson) return typeof foundRun.outputJson === 'object' ? JSON.stringify(foundRun.outputJson, null, 2) : String(foundRun.outputJson);
+  if (foundRun?.output) return typeof foundRun.output === 'object' ? JSON.stringify(foundRun.output, null, 2) : String(foundRun.output);
+
+  const foundNode = currentRun.value?.nodes?.find((n: any) => (n.nodeKey || String(n.id)) === selectedNodeKey.value);
+  if (foundNode?.outputJson) return typeof foundNode.outputJson === 'object' ? JSON.stringify(foundNode.outputJson, null, 2) : String(foundNode.outputJson);
+  if (foundNode?.output) return typeof foundNode.output === 'object' ? JSON.stringify(foundNode.output, null, 2) : String(foundNode.output);
+
+  const status = getNodeStatus(selectedNodeKey.value);
+  if (status === 'RUNNING') return '打字机生成中...';
+  if (status === 'SUCCESS' && currentRun.value?.output) {
+    const lastKey = nodeList.value[nodeList.value.length - 1]?.nodeKey || (workflowNodes.value[workflowNodes.value.length - 1] && String(workflowNodes.value[workflowNodes.value.length - 1].id));
+    if (lastKey === selectedNodeKey.value) {
+      return currentRun.value.output;
+    }
+  }
+  return '等待输出...';
 });
 
 // 超长输出渲染保护：仅渲染末尾 100KB，复制/全屏仍走完整文本
