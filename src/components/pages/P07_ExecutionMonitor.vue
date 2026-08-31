@@ -185,7 +185,7 @@
             v-for="n in workflowNodes"
             :key="n.id"
             class="cursor-pointer"
-            @click="selectedNodeKey = n.id"
+            @click="selectedNodeKey = String(n.id)"
           >
             <rect
               :x="n.position?.x ?? 0"
@@ -193,10 +193,10 @@
               :width="DAG_NODE_W"
               :height="DAG_NODE_H"
               rx="10"
-              :fill="dagStatusFill(n.id)"
-              :stroke="selectedNodeKey === n.id ? '#6366f1' : dagStatusStroke(n.id)"
-              :stroke-width="selectedNodeKey === n.id ? 2.5 : (getNodeStatus(n.id) === 'RUNNING' ? 2.5 : 1.5)"
-              :class="{ 'dag-node-running': getNodeStatus(n.id) === 'RUNNING' }"
+              :fill="dagStatusFill(String(n.id))"
+              :stroke="selectedNodeKey === String(n.id) ? '#6366f1' : dagStatusStroke(String(n.id))"
+              :stroke-width="selectedNodeKey === String(n.id) ? 2.5 : (getNodeStatus(String(n.id)) === 'RUNNING' ? 2.5 : 1.5)"
+              :class="{ 'dag-node-running': getNodeStatus(String(n.id)) === 'RUNNING' }"
             />
             <text
               :x="(n.position?.x ?? 0) + DAG_NODE_W / 2"
@@ -205,7 +205,7 @@
               class="fill-slate-700"
               style="font-size: 12px; font-weight: 600"
             >
-              {{ (n.data?.label || n.id).slice(0, 10) }}
+              {{ getDagNodeLabel(n) }}
             </text>
           </g>
         </svg>
@@ -808,8 +808,8 @@ const dagLayout = computed(() => {
 
 /** 边路径：水平三次贝塞尔（源右侧 → 目标左侧） */
 function dagEdgePath(e: any): string {
-  const s = workflowNodes.value.find((n: any) => n.id === e.source);
-  const t = workflowNodes.value.find((n: any) => n.id === e.target);
+  const s = workflowNodes.value.find((n: any) => String(n.id) === String(e.source));
+  const t = workflowNodes.value.find((n: any) => String(n.id) === String(e.target));
   if (!s || !t) return '';
   const x1 = (s.position?.x ?? 0) + DAG_NODE_W;
   const y1 = (s.position?.y ?? 0) + DAG_NODE_H / 2;
@@ -817,6 +817,13 @@ function dagEdgePath(e: any): string {
   const y2 = (t.position?.y ?? 0) + DAG_NODE_H / 2;
   const dx = Math.max(40, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+/** 节点标签提取：保证 string 且安全截断 */
+function getDagNodeLabel(n: any): string {
+  if (!n) return '';
+  const label = n.data?.label ?? n.label ?? n.name ?? n.id ?? '';
+  return String(label).slice(0, 10);
 }
 
 /** 节点状态 → 填充色（Tailwind 色板十六进制） */
@@ -1274,6 +1281,7 @@ async function handleStopRun() {
   for (const key of Object.keys(nodeStatuses)) {
     if (nodeStatuses[key] === 'RUNNING' || nodeStatuses[key] === 'PENDING') {
       nodeStatuses[key] = 'TERMINATED';
+      if (!nodeErrors[key]) nodeErrors[key] = '执行被用户终止';
     }
   }
 }
@@ -1357,9 +1365,25 @@ function connectWebSocket(runId: number | string, token: string) {
   };
 }
 
-// 打字机流式增量合并缓冲（30ms 节流合并，避免高频 chunks 导致过度渲染）
-const chunkBuffers: Record<string, string[]> = {};
-let chunkFlushTimer: any = null;
+// OUTPUT_CHUNK 批量合并缓冲：token 级分片可达每秒近百次，逐条拼接会触发等频
+// 响应式更新与 DOM 重排；先入缓冲，每帧至多 flush 一次（≈60 次/秒，观感无差别）
+const chunkBuffers = new Map<string, string[]>();
+let chunkFlushRaf: number | null = null;
+
+function flushChunkBuffers() {
+  chunkFlushRaf = null;
+  if (chunkBuffers.size === 0) return;
+  for (const [key, parts] of chunkBuffers) {
+    if (parts.length === 0) continue;
+    nodeOutputs[key] = (nodeOutputs[key] || '') + parts.join('');
+  }
+  chunkBuffers.clear();
+}
+
+function scheduleChunkFlush() {
+  if (chunkFlushRaf !== null) return;
+  chunkFlushRaf = requestAnimationFrame(flushChunkBuffers);
+}
 
 function handleWebSocketEvent(data: WebSocketEvent) {
   if (!currentRun.value) return;
@@ -1398,22 +1422,14 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     case 'OUTPUT_CHUNK': {
       const nodeKey = data.nodeKey || selectedNodeKey.value || 'node-1';
       const chunk = data.payload?.chunk || '';
-      
-      if (!chunkBuffers[nodeKey]) {
-        chunkBuffers[nodeKey] = [];
-      }
-      chunkBuffers[nodeKey].push(chunk);
-
-      if (chunkFlushTimer == null) {
-        chunkFlushTimer = setTimeout(() => {
-          for (const [k, chunks] of Object.entries(chunkBuffers)) {
-            if (chunks.length > 0) {
-              nodeOutputs[k] = (nodeOutputs[k] || '') + chunks.join('');
-              chunks.length = 0;
-            }
-          }
-          chunkFlushTimer = null;
-        }, 30);
+      if (chunk) {
+        let parts = chunkBuffers.get(nodeKey);
+        if (!parts) {
+          parts = [];
+          chunkBuffers.set(nodeKey, parts);
+        }
+        parts.push(chunk);
+        scheduleChunkFlush();
       }
 
       if (!selectedNodeKey.value) {
@@ -1437,12 +1453,7 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'SUCCESS';
       delete nodeErrors[nodeKey];
-
-      // 刷新该节点残留的缓冲区
-      if (chunkBuffers[nodeKey] && chunkBuffers[nodeKey].length > 0) {
-        nodeOutputs[nodeKey] = (nodeOutputs[nodeKey] || '') + chunkBuffers[nodeKey].join('');
-        chunkBuffers[nodeKey].length = 0;
-      }
+      chunkBuffers.delete(nodeKey);
       
       const tokensUsed = data.payload?.tokensUsed;
       const totalTokens = typeof tokensUsed === 'object' && tokensUsed !== null
@@ -1481,12 +1492,7 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       // 区分"执行失败"与"被用户终止"：后端终止事件带 terminated 标志
       const isTerminated = Boolean(data.payload?.terminated);
       nodeStatuses[nodeKey] = isTerminated ? 'TERMINATED' : 'FAILED';
-
-      // 刷新该节点残留的缓冲区
-      if (chunkBuffers[nodeKey] && chunkBuffers[nodeKey].length > 0) {
-        nodeOutputs[nodeKey] = (nodeOutputs[nodeKey] || '') + chunkBuffers[nodeKey].join('');
-        chunkBuffers[nodeKey].length = 0;
-      }
+      chunkBuffers.delete(nodeKey);
 
       const inputVal = data.payload?.input;
       if (inputVal != null) {
@@ -1783,16 +1789,16 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown);
-  if (elapsedTimer) {
+  disconnect();
+  if (elapsedTimer != null) {
     clearInterval(elapsedTimer);
     elapsedTimer = null;
   }
-  if (chunkFlushTimer) {
-    clearTimeout(chunkFlushTimer);
-    chunkFlushTimer = null;
+  if (chunkFlushRaf !== null) {
+    cancelAnimationFrame(chunkFlushRaf);
+    chunkFlushRaf = null;
   }
-  disconnect();
+  window.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
