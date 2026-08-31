@@ -1158,23 +1158,59 @@ export async function testMcpServer(id: string) {
 }
 
 // LLM Provider Operations
-export async function updateLlmProvider(id: string, updates: { apiKey?: string; baseUrl?: string }) {
-  if (!checkPermissionAndNotify('llm_provider:update')) return;
+export async function updateLlmProvider(
+  id: string,
+  updates: {
+    apiKey?: string;
+    baseUrl?: string;
+    displayName?: string;
+    defaultModel?: string;
+    supportedModels?: string[];
+    enabled?: boolean;
+  }
+) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return null;
   try {
-    // 只传明确给出的字段；enabled 不再由前端 status 推断，未传时后端保持原值
     const reqData: Record<string, unknown> = {};
     if (updates.apiKey !== undefined) reqData.apiKey = updates.apiKey;
     if (updates.baseUrl !== undefined) reqData.baseUrl = updates.baseUrl;
+    if (updates.displayName !== undefined) reqData.displayName = updates.displayName;
+    if (updates.defaultModel !== undefined) reqData.defaultModel = updates.defaultModel;
+    if (updates.supportedModels !== undefined) reqData.supportedModels = updates.supportedModels;
+    if (updates.enabled !== undefined) reqData.enabled = updates.enabled;
+
     const dto = await api.updateLlmProvider(id, reqData);
     const updatedLlm = mapLlmDtoToLlm(dto);
     const idx = state.llmProviders.findIndex((p) => p.id === id || p.code === id);
     if (idx !== -1) {
       state.llmProviders[idx] = { ...state.llmProviders[idx], ...updatedLlm };
+    } else {
+      state.llmProviders.push(updatedLlm);
     }
-    addToast({ type: 'success', title: '密钥已加密入库', message: `已保存 ${id} 配置` });
+    addToast({
+      type: 'success',
+      title: '配置已保存',
+      message: `已成功配置 ${updatedLlm.name || id}，参数已加密持久化至数据库`,
+    });
+    return updatedLlm;
   } catch (err: any) {
-    // 删除本地假保存：失败必须如实暴露，否则密钥没入库用户也无从得知
-    addToast({ type: 'error', title: '保存失败', message: err.message || '请检查网络与权限后重试' });
+    const errMsg = err.response?.data?.message || err.message || '请检查网络与权限后重试';
+    addToast({ type: 'error', title: '保存失败', message: errMsg });
+    throw err;
+  }
+}
+
+export async function deleteLlmProvider(provider: string) {
+  if (!checkPermissionAndNotify('llm_provider:update')) return false;
+  try {
+    await api.deleteLlmProvider(provider);
+    await fetchLlmProviders();
+    addToast({ type: 'success', title: '供应商已删除', message: `已成功移除供应商「${provider}」` });
+    return true;
+  } catch (err: any) {
+    const errMsg = err.response?.data?.message || err.message || '删除供应商失败';
+    addToast({ type: 'error', title: '删除失败', message: errMsg });
+    return false;
   }
 }
 
@@ -1366,6 +1402,7 @@ export function useAppStore() {
     deleteMcpServer,
     testMcpServer,
     updateLlmProvider,
+    deleteLlmProvider,
     testLlmProvider,
     addUser,
     updateUser,

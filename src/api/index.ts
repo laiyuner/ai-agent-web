@@ -675,11 +675,15 @@ export const api = {
     return res.data?.data || res.data;
   },
   updateLlmProvider: async (provider: string, data: any) => {
-    const res = await request.put(`/llm-providers/${provider}`, data);
+    const res = await request.put(`/llm-providers/${encodeURIComponent(provider)}`, data);
+    return res.data?.data || res.data;
+  },
+  deleteLlmProvider: async (provider: string) => {
+    const res = await request.delete(`/llm-providers/${encodeURIComponent(provider)}`);
     return res.data?.data || res.data;
   },
   testLlmProvider: async (provider: string) => {
-    const res = await request.post(`/llm-providers/${provider}/test`);
+    const res = await request.post(`/llm-providers/${encodeURIComponent(provider)}/test`);
     return res.data?.data || res.data;
   },
 
