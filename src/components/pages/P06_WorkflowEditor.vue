@@ -312,7 +312,7 @@
                 </div>
                 <div class="flex justify-between">
                   <span>LLM 模型:</span>
-                  <span class="text-slate-200">{{ node.data.llmModel || 'qwen-max' }}</span>
+                  <span class="text-slate-200">{{ node.data.llmModel || '未设置' }}</span>
                 </div>
               </div>
 
@@ -678,7 +678,7 @@ function addConditionNode() {
 function addAgentNode() {
   const ag = state.agents[0];
   if (ag) addSpecificAgentNode(ag);
-  else addSpecificAgentNode({ name: '通义千问 Agent', type: 'ReAct', id: '1' });
+  else addSpecificAgentNode({ name: '通用 Agent', type: 'ReAct', id: '1', model: '' });
 }
 
 function addSpecificAgentNode(ag: any) {
@@ -693,7 +693,7 @@ function addSpecificAgentNode(ag: any) {
       agentId: String(ag.id),
       agentName: ag.name,
       agentType: ag.type,
-      llmModel: ag.model || 'qwen-max',
+      llmModel: ag.model,
       timeoutSeconds: ag.timeout || 30,
       retries: ag.maxRetries || 3,
     },

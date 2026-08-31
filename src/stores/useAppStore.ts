@@ -134,10 +134,11 @@ const mockLlmProviders: LLMProvider[] = [
     name: '智谱开放平台 (BigModel)',
     code: 'zhipu',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    apiKeyConfigured: true,
+    apiKeyConfigured: false,
+    keySource: 'NONE',
     defaultModel: 'glm-4-flash',
     supportedModels: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'],
-    status: 'configured',
+    status: 'unconfigured',
     isBuiltIn: true,
   },
   {
@@ -145,10 +146,11 @@ const mockLlmProviders: LLMProvider[] = [
     name: 'DeepSeek API 网关',
     code: 'deepseek',
     baseUrl: 'https://api.deepseek.com/v1',
-    apiKeyConfigured: true,
+    apiKeyConfigured: false,
+    keySource: 'NONE',
     defaultModel: 'deepseek-chat',
     supportedModels: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
-    status: 'configured',
+    status: 'unconfigured',
     isBuiltIn: true,
   },
   {
@@ -157,6 +159,7 @@ const mockLlmProviders: LLMProvider[] = [
     code: 'openai',
     baseUrl: 'https://api.openai.com/v1',
     apiKeyConfigured: false,
+    keySource: 'NONE',
     defaultModel: 'gpt-4o',
     supportedModels: ['gpt-4o', 'gpt-4o-mini', 'o1-preview'],
     status: 'unconfigured',
@@ -953,8 +956,8 @@ export async function addAgent(agent: Omit<Agent, 'id' | 'updatedAt' | 'creator'
       name: agent.name,
       description: agent.description,
       systemPrompt: agent.systemPrompt,
-      llmProvider: agent.llmProviderId || 'zhipu',
-      llmModel: agent.model || 'glm-4-flash',
+      llmProvider: agent.llmProviderId,
+      llmModel: agent.model,
       llmParams: {
         temperature: agent.temperature ?? 0.7,
         max_tokens: agent.maxTokens ?? 2000,
@@ -1155,65 +1158,23 @@ export async function testMcpServer(id: string) {
 }
 
 // LLM Provider Operations
-export async function updateLlmProvider(id: string, updates: Partial<LLMProvider> & { apiKey?: string }) {
+export async function updateLlmProvider(id: string, updates: { apiKey?: string; baseUrl?: string }) {
   if (!checkPermissionAndNotify('llm_provider:update')) return;
   try {
-    const reqData = {
-      apiKey: updates.apiKey,
-      baseUrl: updates.baseUrl,
-      enabled: updates.status === 'configured',
-    };
+    // 只传明确给出的字段；enabled 不再由前端 status 推断，未传时后端保持原值
+    const reqData: Record<string, unknown> = {};
+    if (updates.apiKey !== undefined) reqData.apiKey = updates.apiKey;
+    if (updates.baseUrl !== undefined) reqData.baseUrl = updates.baseUrl;
     const dto = await api.updateLlmProvider(id, reqData);
     const updatedLlm = mapLlmDtoToLlm(dto);
     const idx = state.llmProviders.findIndex((p) => p.id === id || p.code === id);
     if (idx !== -1) {
       state.llmProviders[idx] = { ...state.llmProviders[idx], ...updatedLlm };
     }
-    addToast({ type: 'success', title: '供应商配置更新', message: `已保存 ${id} 配置` });
+    addToast({ type: 'success', title: '密钥已加密入库', message: `已保存 ${id} 配置` });
   } catch (err: any) {
-    const idx = state.llmProviders.findIndex((p) => p.id === id);
-    if (idx !== -1) {
-      state.llmProviders[idx] = {
-        ...state.llmProviders[idx],
-        ...updates,
-        status: updates.apiKeyConfigured ? 'configured' : 'unconfigured',
-      };
-    }
-    addToast({ type: 'info', title: '本地保存 LLM 配置', message: `接口同步: ${err.message}` });
-  }
-}
-
-export function addLlmProvider(provider: Omit<LLMProvider, 'id' | 'status'>) {
-  if (!checkPermissionAndNotify('llm_provider:update')) return;
-  const newProvider: LLMProvider = {
-    ...provider,
-    id: `llm-${Date.now().toString().slice(-4)}`,
-    status: provider.apiKeyConfigured ? 'configured' : 'unconfigured',
-  };
-  state.llmProviders.push(newProvider);
-  addToast({ type: 'success', title: '供应商添加成功', message: `已成功对接 ${newProvider.name}` });
-}
-
-export function addModelToProvider(providerId: string, modelName: string) {
-  if (!checkPermissionAndNotify('llm_provider:update')) return;
-  const p = state.llmProviders.find((x) => x.id === providerId || x.code === providerId);
-  if (p && modelName.trim()) {
-    const trimmed = modelName.trim();
-    if (!p.supportedModels.includes(trimmed)) {
-      p.supportedModels.push(trimmed);
-      addToast({ type: 'success', title: '模型扩充成功', message: `${p.name} 已挂载模型 ${trimmed}` });
-    } else {
-      addToast({ type: 'info', title: '模型已存在', message: `模型 ${trimmed} 已在列表中` });
-    }
-  }
-}
-
-export function setDefaultModel(providerId: string, modelName: string) {
-  if (!checkPermissionAndNotify('llm_provider:update')) return;
-  const p = state.llmProviders.find((x) => x.id === providerId || x.code === providerId);
-  if (p) {
-    p.defaultModel = modelName;
-    addToast({ type: 'success', title: '默认模型更新', message: `${p.name} 默认路由调整为 ${modelName}` });
+    // 删除本地假保存：失败必须如实暴露，否则密钥没入库用户也无从得知
+    addToast({ type: 'error', title: '保存失败', message: err.message || '请检查网络与权限后重试' });
   }
 }
 
@@ -1405,9 +1366,6 @@ export function useAppStore() {
     deleteMcpServer,
     testMcpServer,
     updateLlmProvider,
-    addLlmProvider,
-    addModelToProvider,
-    setDefaultModel,
     testLlmProvider,
     addUser,
     updateUser,

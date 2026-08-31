@@ -164,13 +164,13 @@
                   >
                     <div class="flex items-center gap-2 truncate">
                       <div
-                        class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold font-mono border"
+                        class="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 font-mono border"
                         :class="getProviderStyle(form.llmProviderId).bg"
                       >
                         {{ getProviderStyle(form.llmProviderId).badge }}
                       </div>
                       <span class="font-semibold text-slate-800 truncate">
-                        {{ currentProviderName }}
+                        {{ currentProviderDisplayName }}
                       </span>
                     </div>
                     <ChevronDown
@@ -188,7 +188,7 @@
                     >
                       <div class="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                         <span>可用 LLM 供应商</span>
-                        <span class="font-mono">{{ availableProviders.length }} 个可用</span>
+                        <span class="font-mono">{{ availableProviders.length }} 个</span>
                       </div>
 
                       <!-- Provider List -->
@@ -207,17 +207,23 @@
                             {{ getProviderStyle(p.id).badge }}
                           </div>
                           <div class="min-w-0">
-                            <div class="flex items-center gap-1.5">
-                              <span class="font-bold text-xs text-slate-900 truncate">{{ p.name }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                              <span class="font-bold text-xs text-slate-900 truncate">
+                                {{ p.name }}{{ (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')) ? '（未配置密钥）' : '' }}
+                              </span>
                               <span
                                 class="text-[9px] px-1 py-0.2 rounded font-mono"
-                                :class="p.apiKeyConfigured ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/80' : 'bg-amber-50 text-amber-600 border border-amber-200/80'"
+                                :class="
+                                  (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE'))
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/80'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                "
                               >
-                                {{ p.apiKeyConfigured ? '就绪' : '未配Key' }}
+                                {{ (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) ? '已配置' : '未配置' }}
                               </span>
                             </div>
                             <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                              {{ p.supportedModels.length }} 个模型 • {{ p.code }}
+                              {{ (p.supportedModels || []).length }} 个模型 • {{ p.code }}
                             </div>
                           </div>
                         </div>
@@ -229,8 +235,8 @@
                         <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
                           <Cpu class="w-4 h-4" />
                         </div>
-                        <p class="text-xs text-slate-500 font-medium">暂无已启用的供应商</p>
-                        <p class="text-[10px] text-slate-400">请前往「LLM 供应商」页面配置 API Key</p>
+                        <p class="text-xs text-slate-500 font-medium">暂无供应商</p>
+                        <p class="text-[10px] text-slate-400">请前往「LLM 供应商」页面查看配置</p>
                       </div>
                     </div>
                   </Transition>
@@ -496,7 +502,7 @@ import {
 import { useAppStore } from '../../stores/useAppStore';
 import { Agent, AgentType, AgentMcpBinding } from '../../types';
 
-const { state, addAgent, updateAgent, hasPermission } = useAppStore();
+const { state, addAgent, updateAgent, addToast, hasPermission } = useAppStore();
 
 const isEdit = computed(() => !!state.editingAgent);
 
@@ -511,9 +517,9 @@ const form = ref({
   name: '',
   description: '',
   type: 'ReAct' as AgentType,
-  llmProviderId: 'zhipu',
-  llmProviderName: '智谱 BigModel',
-  model: 'glm-4-flash',
+  llmProviderId: '',
+  llmProviderName: '',
+  model: '',
   temperature: 0.7,
   maxTokens: 2000,
   systemPrompt: '',
@@ -528,17 +534,18 @@ const form = ref({
 /** 当前勾选绑定的 MCP 服务器 ID 列表（checkbox v-model） */
 const boundServerIds = ref<string[]>([]);
 
-/** 内置默认供应商兜底（防止异步加载或空数据时异常） */
+/** 内置默认供应商兜底（仅在未获取到供应商列表时使用） */
 const DEFAULT_FALLBACK_PROVIDERS = [
   {
     id: 'zhipu',
     name: '智谱开放平台 (BigModel)',
     code: 'zhipu',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    apiKeyConfigured: true,
+    apiKeyConfigured: false,
+    keySource: 'NONE',
     defaultModel: 'glm-4-flash',
-    supportedModels: ['glm-4-flash', 'glm-4-plus', 'glm-4-air', 'glm-4-0520'],
-    status: 'configured' as const,
+    supportedModels: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'],
+    status: 'unconfigured' as const,
     isBuiltIn: true,
   },
   {
@@ -546,10 +553,11 @@ const DEFAULT_FALLBACK_PROVIDERS = [
     name: 'DeepSeek API 网关',
     code: 'deepseek',
     baseUrl: 'https://api.deepseek.com/v1',
-    apiKeyConfigured: true,
+    apiKeyConfigured: false,
+    keySource: 'NONE',
     defaultModel: 'deepseek-chat',
     supportedModels: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
-    status: 'configured' as const,
+    status: 'unconfigured' as const,
     isBuiltIn: true,
   },
   {
@@ -557,37 +565,16 @@ const DEFAULT_FALLBACK_PROVIDERS = [
     name: 'OpenAI 官方 API',
     code: 'openai',
     baseUrl: 'https://api.openai.com/v1',
-    apiKeyConfigured: true,
-    defaultModel: 'gpt-4o',
-    supportedModels: ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1-preview'],
-    status: 'configured' as const,
-    isBuiltIn: true,
-  },
-  {
-    id: 'qwen',
-    name: '阿里云通义千问 Qwen',
-    code: 'qwen',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKeyConfigured: true,
-    defaultModel: 'qwen-max',
-    supportedModels: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen2.5-72b-instruct'],
-    status: 'configured' as const,
-    isBuiltIn: true,
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama 本地部署',
-    code: 'ollama',
-    baseUrl: 'http://localhost:11434/v1',
     apiKeyConfigured: false,
-    defaultModel: 'llama3.2',
-    supportedModels: ['llama3.2', 'qwen2.5-coder', 'deepseek-r1:7b'],
+    keySource: 'NONE',
+    defaultModel: 'gpt-4o',
+    supportedModels: ['gpt-4o', 'gpt-4o-mini', 'o1-preview'],
     status: 'unconfigured' as const,
     isBuiltIn: true,
   },
 ];
 
-/** 可用供应商列表 */
+/** 可用供应商列表（不禁用、不过滤未配置密钥的供应商） */
 const availableProviders = computed(() => {
   if (state.llmProviders && state.llmProviders.length > 0) {
     return state.llmProviders;
@@ -595,19 +582,29 @@ const availableProviders = computed(() => {
   return DEFAULT_FALLBACK_PROVIDERS;
 });
 
-/** 当前选择的供应商名称 */
-const currentProviderName = computed(() => {
-  const p = availableProviders.value.find((x) => x.id === form.value.llmProviderId);
-  return p ? p.name : form.value.llmProviderName || '智谱 BigModel';
+/** 当前选择的供应商展示名称（若未配置密钥则追加后缀提示） */
+const currentProviderDisplayName = computed(() => {
+  if (!form.value.llmProviderId) return '请选择 LLM 供应商';
+  const p = availableProviders.value.find((x) => x.id === form.value.llmProviderId || x.code === form.value.llmProviderId);
+  if (!p) return form.value.llmProviderName || '请选择 LLM 供应商';
+  const unconfigured = p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE');
+  return `${p.name}${unconfigured ? '（未配置密钥）' : ''}`;
 });
 
-/** 当前供应商所支持的模型列表 */
+/** 当前选择的供应商基础名称 */
+const currentProviderName = computed(() => {
+  if (!form.value.llmProviderId) return '请选择 LLM 供应商';
+  const p = availableProviders.value.find((x) => x.id === form.value.llmProviderId || x.code === form.value.llmProviderId);
+  return p ? p.name : form.value.llmProviderName || '请选择 LLM 供应商';
+});
+
+/** 当前供应商所支持的模型列表（来自后端 supportedModels） */
 const currentSupportedModels = computed(() => {
-  const p = availableProviders.value.find((x) => x.id === form.value.llmProviderId);
-  if (p && p.supportedModels && p.supportedModels.length > 0) {
+  const p = availableProviders.value.find((x) => x.id === form.value.llmProviderId || x.code === form.value.llmProviderId);
+  if (p && Array.isArray(p.supportedModels) && p.supportedModels.length > 0) {
     return p.supportedModels;
   }
-  return ['glm-4-flash', 'glm-4-plus'];
+  return [];
 });
 
 /** 过滤后的模型列表 */
@@ -644,6 +641,8 @@ function selectProvider(p: any) {
     form.value.model = p.defaultModel;
   } else if (p.supportedModels && p.supportedModels.length > 0) {
     form.value.model = p.supportedModels[0];
+  } else {
+    form.value.model = '';
   }
   openDropdown.value = null;
 }
@@ -735,9 +734,9 @@ watch(
         name: '',
         description: '',
         type: 'ReAct',
-        llmProviderId: 'zhipu',
-        llmProviderName: '智谱 BigModel',
-        model: 'glm-4-flash',
+        llmProviderId: '',
+        llmProviderName: '',
+        model: '',
         temperature: 0.7,
         maxTokens: 2000,
         systemPrompt: '',
@@ -787,6 +786,15 @@ function closeDrawer() {
 
 async function handleSubmit() {
   if (!form.value.name || !form.value.systemPrompt) {
+    addToast({ type: 'warning', title: '提示', message: '请填写 Agent 名称和系统 Prompt' });
+    return;
+  }
+  if (!form.value.llmProviderId) {
+    addToast({ type: 'warning', title: '提示', message: '请选择 LLM 供应商' });
+    return;
+  }
+  if (!form.value.model) {
+    addToast({ type: 'warning', title: '提示', message: '请选择 LLM 模型（模型为必填项）' });
     return;
   }
   // 同步勾选的 MCP 到绑定列表（取消勾选 = 移除绑定）

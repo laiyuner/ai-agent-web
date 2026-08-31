@@ -8,20 +8,8 @@
           <span>LLM 大模型供应商与网关配置</span>
         </h2>
         <p class="text-xs sm:text-sm text-slate-500 mt-1">
-          统一管理与监控 OpenAI 兼容协议、智谱 BigModel、通义千问及本地私有化 (Ollama/vLLM) 接入基点与 API 凭证
+          统一管理与监控智谱开放平台 (BigModel)、DeepSeek API 及 OpenAI 官方协议接入基点与数据库密钥凭证
         </p>
-      </div>
-
-      <!-- Right Actions: Add Provider Button -->
-      <div class="flex items-center gap-3 shrink-0">
-        <button
-          v-if="hasPermission('llm_provider:update')"
-          @click="openAddModal"
-          class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm transition-all flex items-center gap-2 shadow-sm cursor-pointer"
-        >
-          <Plus class="w-4 h-4 text-emerald-400" />
-          <span>添加自定义 LLM 供应商</span>
-        </button>
       </div>
     </div>
 
@@ -87,16 +75,20 @@
                 </div>
 
                 <div class="flex items-center gap-2 mt-1">
+                  <!-- 密钥来源徽章：DATABASE 绿色「数据库密钥」/ NONE 灰色「未配置密钥」 -->
                   <span
                     class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0"
                     :class="
-                      p.status === 'configured'
+                      p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200/80'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                     "
                   >
-                    <span class="w-1.5 h-1.5 rounded-full" :class="p.status === 'configured' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'"></span>
-                    {{ p.status === 'configured' ? '已配置 Key' : '未设置密钥' }}
+                    <span
+                      class="w-1.5 h-1.5 rounded-full"
+                      :class="p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE') ? 'bg-emerald-500' : 'bg-slate-400'"
+                    ></span>
+                    {{ (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) ? '数据库密钥' : '未配置密钥' }}
                   </span>
 
                   <span class="text-[11px] text-slate-400 font-medium truncate font-mono">
@@ -106,10 +98,10 @@
               </div>
             </div>
 
-            <!-- Test Connection Button (Matching global unified button style) -->
+            <!-- Test Connection Button (带前置已配置校验) -->
             <button
               v-if="hasPermission('llm_provider:test')"
-              @click="testLlmProvider(p.id)"
+              @click="handleTestProvider(p)"
               title="测试 Endpoint 握手连通性与响应延时"
               class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 text-xs font-bold border border-indigo-200/80 hover:border-indigo-300 transition-all flex items-center gap-1.5 group cursor-pointer shadow-2xs shrink-0 mt-0.5 btn-tactile"
             >
@@ -118,14 +110,36 @@
             </button>
           </div>
 
-          <!-- Base URL Display Box (Single line with copy button & truncation protection) -->
-          <div class="bg-slate-50/80 border border-slate-200/70 rounded-xl p-2.5 space-y-1 min-w-0">
+          <!-- 未配置密钥行内小字提示 -->
+          <div
+            v-if="p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')"
+            class="flex items-start gap-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-500 text-[11px] leading-relaxed"
+          >
+            <AlertCircle class="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+            <span>未配置密钥的供应商无法执行节点，请点击编辑配置 API Key（密钥仅支持在此页面配置）</span>
+          </div>
+
+          <!-- Base URL Display & Edit Box -->
+          <div class="bg-slate-50/80 border border-slate-200/70 rounded-xl p-2.5 space-y-1.5 min-w-0">
             <div class="flex items-center justify-between text-[11px] text-slate-400 font-medium">
               <span>API Base URL Endpoint</span>
-              <span class="font-mono text-[10px] text-slate-400">REST / v1</span>
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-[10px] text-slate-400">REST / v1</span>
+                <!-- 编辑 Base URL 切换按钮 -->
+                <button
+                  v-if="hasPermission('llm_provider:update')"
+                  @click="toggleEditBaseUrl(p)"
+                  class="ml-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-0.5 cursor-pointer"
+                  :title="editingBaseUrlId === p.id ? '取消编辑' : '编辑 Base URL'"
+                >
+                  <Pencil class="w-3 h-3" />
+                  <span>{{ editingBaseUrlId === p.id ? '取消' : '编辑' }}</span>
+                </button>
+              </div>
             </div>
 
-            <div class="flex items-center justify-between gap-2 min-w-0">
+            <!-- 展示状态 -->
+            <div v-if="editingBaseUrlId !== p.id" class="flex items-center justify-between gap-2 min-w-0">
               <span
                 class="font-mono text-xs text-slate-800 font-semibold truncate min-w-0 select-all"
                 :title="p.baseUrl"
@@ -141,35 +155,49 @@
                 <Copy class="w-3.5 h-3.5" />
               </button>
             </div>
+
+            <!-- 编辑状态 -->
+            <div v-else class="space-y-1.5 pt-0.5">
+              <div class="flex items-center gap-1.5">
+                <input
+                  v-model="baseUrlInputs[p.id]"
+                  type="text"
+                  placeholder="https://api.example.com/v1"
+                  class="w-full px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+                <button
+                  @click="saveBaseUrl(p)"
+                  class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
+                >
+                  保存
+                </button>
+              </div>
+              <p
+                v-if="p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')"
+                class="text-[10px] text-amber-600 flex items-center gap-1"
+              >
+                <AlertCircle class="w-3 h-3 shrink-0" />
+                <span>该供应商尚未配置密钥，保存 Base URL 时请同时在下方填写 API Key</span>
+              </p>
+            </div>
           </div>
 
-          <!-- Supported Models List Section -->
+          <!-- Supported Models List Section (纯展示，由后端统一管理) -->
           <div class="space-y-2 min-w-0 mt-auto">
             <div class="flex items-center justify-between">
               <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">支持模型 ({{ p.supportedModels.length }})</span>
-              
-              <!-- Quick Add Model Link -->
-              <button
-                v-if="hasPermission('llm_provider:update')"
-                @click="promptAddModel(p.id)"
-                class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer btn-tactile"
-              >
-                <Plus class="w-3 h-3" />
-                <span>挂载模型</span>
-              </button>
+              <span class="text-[10px] text-slate-400">模型目录由后端统一管理</span>
             </div>
 
             <div class="flex flex-wrap gap-1.5 min-w-0 max-h-32 overflow-y-auto pr-1">
               <div
                 v-for="m in p.supportedModels"
                 :key="m"
-                @click="setDefaultModel(p.id, m)"
-                title="点击设置为当前供应商的默认全局模型"
-                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg font-mono transition-all cursor-pointer border min-w-0 max-w-[200px] btn-tactile select-none"
+                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg font-mono border min-w-0 max-w-[200px] select-none"
                 :class="
                   m === p.defaultModel
                     ? 'bg-indigo-50 text-indigo-700 font-bold border-indigo-200 shadow-2xs'
-                    : 'bg-slate-100/80 text-slate-600 border-slate-200/80 hover:bg-slate-200/80 hover:text-slate-900'
+                    : 'bg-slate-100/80 text-slate-600 border-slate-200/80'
                 "
               >
                 <Star v-if="m === p.defaultModel" class="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
@@ -185,7 +213,7 @@
           <div class="flex items-center justify-between">
             <label class="block text-xs font-bold text-slate-800">设置 / 切换 API Key</label>
             <span class="text-[11px] text-slate-400 font-mono">
-              {{ p.apiKeyConfigured ? '密钥掩码已上锁' : '暂无配置密钥' }}
+              {{ (p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '数据库密文存储中' : '暂无配置密钥' }}
             </span>
           </div>
 
@@ -195,7 +223,7 @@
               <input
                 v-model="keyInputs[p.id]"
                 :type="showKeys[p.id] ? 'text' : 'password'"
-                :placeholder="p.apiKeyConfigured ? '•••••••••••••••• (密文存储中)' : 'sk-********************************'"
+                :placeholder="(p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '•••••••••••••••• (数据库密文存储中)' : 'sk-********************************'"
                 class="w-full pl-8 pr-8 py-1.5 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/40 focus:bg-white transition-all"
               />
               <button
@@ -227,112 +255,8 @@
       </div>
       <h3 class="text-base font-bold text-slate-800">未找到匹配的 LLM 供应商</h3>
       <p class="text-xs text-slate-500 max-w-sm mx-auto">
-        尝试调整关键词或切换筛选分类，亦可点击右上角添加自定义大模型 Endpoint
+        请联系管理员在 LLM 供应商管理页配置密钥
       </p>
-    </div>
-
-    <!-- Add Custom LLM Provider Modal -->
-    <div
-      v-if="showAddModal"
-      class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
-    >
-      <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg p-6 space-y-5">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div class="flex items-center gap-2.5">
-            <div class="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-              <Cpu class="w-5 h-5" />
-            </div>
-            <div>
-              <h3 class="font-bold text-slate-900 text-base">注册自定义大模型供应商</h3>
-              <p class="text-xs text-slate-500">对接 OpenAI Standard API / FastGPT / DeepSeek 或专有网关</p>
-            </div>
-          </div>
-          <button @click="showAddModal = false" class="text-slate-400 hover:text-slate-600 text-lg font-bold cursor-pointer">&times;</button>
-        </div>
-
-        <form @submit.prevent="submitNewProvider" class="space-y-4 text-xs sm:text-sm">
-          <div class="space-y-1.5">
-            <label class="block font-bold text-slate-700">供应商展示名称 <span class="text-rose-500">*</span></label>
-            <input
-              v-model="newForm.name"
-              required
-              type="text"
-              placeholder="例如：DeepSeek 官方 API / Azure OpenAI / OpenRouter"
-              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1.5">
-              <label class="block font-bold text-slate-700">唯一标识 Code <span class="text-rose-500">*</span></label>
-              <input
-                v-model="newForm.code"
-                required
-                type="text"
-                placeholder="deepseek / azure / vllm"
-                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div class="space-y-1.5">
-              <label class="block font-bold text-slate-700">默认主推荐模型 <span class="text-rose-500">*</span></label>
-              <input
-                v-model="newForm.defaultModel"
-                required
-                type="text"
-                placeholder="deepseek-chat / gpt-4o"
-                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="block font-bold text-slate-700">API Base URL Endpoint <span class="text-rose-500">*</span></label>
-            <input
-              v-model="newForm.baseUrl"
-              required
-              type="text"
-              placeholder="https://api.deepseek.com/v1/"
-              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="block font-bold text-slate-700">初始 API Key 密钥 (可选)</label>
-            <input
-              v-model="newForm.apiKey"
-              type="password"
-              placeholder="sk-****************"
-              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div class="space-y-1.5">
-            <label class="block font-bold text-slate-700">支持模型清单 (英文逗号分割)</label>
-            <input
-              v-model="newForm.modelsStr"
-              type="text"
-              placeholder="deepseek-chat, deepseek-reasoner, deepseek-coder"
-              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div class="pt-3 flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              @click="showAddModal = false"
-              class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-xs"
-            >
-              保存并完成注册
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   </div>
 </template>
@@ -345,67 +269,55 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Plus,
   Copy,
   Star,
   Search,
   Sparkles,
   Zap,
-  Globe,
-  HardDrive,
   Server,
+  AlertCircle,
+  Pencil,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
+import type { LLMProvider } from '../../types';
 
 const {
   state,
   updateLlmProvider,
-  addLlmProvider,
-  addModelToProvider,
-  setDefaultModel,
   testLlmProvider,
   addToast,
   hasPermission,
 } = useAppStore();
 
 const searchQuery = ref('');
-const activeFilter = ref<'all' | 'configured' | 'unconfigured' | 'local'>('all');
+const activeFilter = ref<'all' | 'configured' | 'unconfigured'>('all');
 
 const filterTabs = [
-  { id: 'all', label: '全部供应商' },
-  { id: 'configured', label: '已配置凭证' },
-  { id: 'unconfigured', label: '待补全密钥' },
-  { id: 'local', label: '私有化 / Local' },
+  { id: 'all' as const, label: '全部供应商' },
+  { id: 'configured' as const, label: '数据库密钥 (已配置)' },
+  { id: 'unconfigured' as const, label: '未配置密钥' },
 ];
 
 const keyInputs = reactive<Record<string, string>>({});
 const showKeys = reactive<Record<string, boolean>>({});
 
-// Modal State
-const showAddModal = ref(false);
-const newForm = reactive({
-  name: '',
-  code: '',
-  baseUrl: '',
-  apiKey: '',
-  defaultModel: '',
-  modelsStr: '',
-});
+// Base URL 编辑状态与输入缓存
+const editingBaseUrlId = ref<string | null>(null);
+const baseUrlInputs = reactive<Record<string, string>>({});
 
 function getCountByFilter(filterId: string) {
   if (filterId === 'all') return state.llmProviders.length;
-  if (filterId === 'configured') return state.llmProviders.filter((p) => p.status === 'configured').length;
-  if (filterId === 'unconfigured') return state.llmProviders.filter((p) => p.status !== 'configured').length;
-  if (filterId === 'local') return state.llmProviders.filter((p) => p.baseUrl.includes('localhost') || p.code === 'ollama').length;
+  if (filterId === 'configured') return state.llmProviders.filter((p) => p.keySource === 'DATABASE' || p.status === 'configured').length;
+  if (filterId === 'unconfigured') return state.llmProviders.filter((p) => p.keySource === 'NONE' || p.status !== 'configured').length;
   return 0;
 }
 
 const filteredProviders = computed(() => {
   return state.llmProviders.filter((p) => {
+    const isConfigured = p.keySource === 'DATABASE' || p.status === 'configured';
     // Filter Tab
-    if (activeFilter.value === 'configured' && p.status !== 'configured') return false;
-    if (activeFilter.value === 'unconfigured' && p.status === 'configured') return false;
-    if (activeFilter.value === 'local' && !p.baseUrl.includes('localhost') && p.code !== 'ollama') return false;
+    if (activeFilter.value === 'configured' && !isConfigured) return false;
+    if (activeFilter.value === 'unconfigured' && isConfigured) return false;
 
     // Search Query
     if (searchQuery.value.trim()) {
@@ -424,12 +336,10 @@ function getBrandStyle(code: string) {
   switch (code) {
     case 'zhipu':
       return { bgClass: 'bg-purple-50 border-purple-200', textClass: 'text-purple-600', icon: Sparkles };
+    case 'deepseek':
+      return { bgClass: 'bg-blue-50 border-blue-200', textClass: 'text-blue-600', icon: Cpu };
     case 'openai':
       return { bgClass: 'bg-emerald-50 border-emerald-200', textClass: 'text-emerald-600', icon: Zap };
-    case 'qwen':
-      return { bgClass: 'bg-sky-50 border-sky-200', textClass: 'text-sky-600', icon: Globe };
-    case 'ollama':
-      return { bgClass: 'bg-amber-50 border-amber-200', textClass: 'text-amber-600', icon: HardDrive };
     default:
       return { bgClass: 'bg-indigo-50 border-indigo-200', textClass: 'text-indigo-600', icon: Server };
   }
@@ -438,18 +348,63 @@ function getBrandStyle(code: string) {
 function saveKey(id: string) {
   const val = keyInputs[id];
   if (val && val.trim()) {
-    updateLlmProvider(id, { apiKeyConfigured: true });
+    // 关键修复：必须把用户输入的明文 Key 传给后端（后端 AES 加密落库），
+    // 之前传 apiKeyConfigured 布尔标志导致密钥从未真正保存
+    updateLlmProvider(id, { apiKey: val.trim() });
     keyInputs[id] = '';
   } else {
     addToast({ type: 'warning', title: '提示', message: '请输入有效的新 API Key 凭证' });
   }
 }
 
-function promptAddModel(providerId: string) {
-  const input = window.prompt('请输入需要追加绑定的 LLM 模型名称 (例如: deepseek-v3 / gpt-4.5-turbo):');
-  if (input && input.trim()) {
-    addModelToProvider(providerId, input.trim());
+function toggleEditBaseUrl(p: LLMProvider) {
+  if (editingBaseUrlId.value === p.id) {
+    editingBaseUrlId.value = null;
+  } else {
+    editingBaseUrlId.value = p.id;
+    baseUrlInputs[p.id] = p.baseUrl;
   }
+}
+
+function saveBaseUrl(p: LLMProvider) {
+  const newUrl = baseUrlInputs[p.id]?.trim();
+  if (!newUrl) {
+    addToast({ type: 'warning', title: '提示', message: 'Base URL 不能为空' });
+    return;
+  }
+
+  const updates: { baseUrl: string; apiKey?: string } = { baseUrl: newUrl };
+
+  // 若数据库中无记录且未配置密钥，新建 upsert 要求必须带 apiKey
+  const unconfigured = p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE');
+  if (unconfigured) {
+    const keyVal = keyInputs[p.id]?.trim();
+    if (!keyVal) {
+      addToast({
+        type: 'warning',
+        title: '需要填写 API Key',
+        message: '该供应商尚未在数据库中配置，保存 Base URL 时请同时在下方输入 API Key',
+      });
+      return;
+    }
+    updates.apiKey = keyVal;
+  }
+
+  updateLlmProvider(p.id, updates);
+  editingBaseUrlId.value = null;
+}
+
+function handleTestProvider(p: LLMProvider) {
+  const isConfigured = p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE');
+  if (!isConfigured) {
+    addToast({
+      type: 'warning',
+      title: '未配置密钥',
+      message: '请先配置 API Key 再测试连通性',
+    });
+    return;
+  }
+  testLlmProvider(p.id);
 }
 
 function copyToClipboard(text: string) {
@@ -457,39 +412,5 @@ function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
     addToast({ type: 'info', title: '已复制至剪贴板', message: text });
   }
-}
-
-function openAddModal() {
-  newForm.name = '';
-  newForm.code = '';
-  newForm.baseUrl = 'https://api.openai.com/v1/';
-  newForm.apiKey = '';
-  newForm.defaultModel = '';
-  newForm.modelsStr = '';
-  showAddModal.value = true;
-}
-
-function submitNewProvider() {
-  if (!newForm.name || !newForm.code || !newForm.baseUrl || !newForm.defaultModel) return;
-
-  const modelsList = newForm.modelsStr
-    ? newForm.modelsStr.split(',').map((s) => s.trim()).filter(Boolean)
-    : [newForm.defaultModel];
-
-  if (!modelsList.includes(newForm.defaultModel)) {
-    modelsList.unshift(newForm.defaultModel);
-  }
-
-  addLlmProvider({
-    name: newForm.name,
-    code: newForm.code.toLowerCase(),
-    baseUrl: newForm.baseUrl,
-    apiKeyConfigured: !!newForm.apiKey,
-    defaultModel: newForm.defaultModel,
-    supportedModels: modelsList,
-    isBuiltIn: false,
-  });
-
-  showAddModal.value = false;
 }
 </script>

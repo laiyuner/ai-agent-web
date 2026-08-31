@@ -308,11 +308,9 @@ export function mapAgentDtoToAgent(dto: any): Agent {
   const boundTools = mcpBindings.flatMap((m) => m.enabledTools);
 
   const providerNames: Record<string, string> = {
-    zhipu: '智谱 BigModel',
-    deepseek: 'DeepSeek 官方',
-    openai: 'OpenAI GPT',
-    qwen: '通义千问 Qwen',
-    ollama: 'Ollama 本地引擎',
+    zhipu: '智谱开放平台 (BigModel)',
+    deepseek: 'DeepSeek API 网关',
+    openai: 'OpenAI 官方 API',
   };
 
   return {
@@ -321,9 +319,9 @@ export function mapAgentDtoToAgent(dto: any): Agent {
     description: dto.description || '',
     type: 'ReAct',
     isPublic: !!dto.isPublic,
-    llmProviderId: dto.llmProvider || 'zhipu',
+    llmProviderId: dto.llmProvider || '',
     llmProviderName: providerNames[dto.llmProvider] || dto.llmProvider || '通用 LLM',
-    model: dto.llmModel || 'glm-4-flash',
+    model: dto.llmModel || '',
     temperature: dto.llmParams?.temperature ?? 0.7,
     maxTokens: dto.llmParams?.max_tokens ?? 2000,
     systemPrompt: dto.systemPrompt || '',
@@ -415,40 +413,21 @@ export function mapMcpDtoToMcp(dto: any): MCPServer {
 }
 
 export function mapLlmDtoToLlm(dto: any): LLMProvider {
-  const names: Record<string, string> = {
-    zhipu: '智谱开放平台 (BigModel)',
-    deepseek: 'DeepSeek API 网关',
-    openai: 'OpenAI 官方 API',
-    qwen: '阿里云通义千问 Qwen',
-    ollama: 'Ollama 本地部署',
-  };
-
-  const defaultModels: Record<string, string> = {
-    zhipu: 'glm-4-flash',
-    deepseek: 'deepseek-chat',
-    openai: 'gpt-4o',
-    qwen: 'qwen-max',
-    ollama: 'llama3.2',
-  };
-
-  const models: Record<string, string[]> = {
-    zhipu: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'],
-    deepseek: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'],
-    openai: ['gpt-4o', 'gpt-4o-mini', 'o1-preview'],
-    qwen: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
-    ollama: ['llama3.2', 'qwen2.5-coder', 'deepseek-r1:7b'],
-  };
-
   const pCode = dto.provider || 'zhipu';
 
   return {
     id: pCode,
-    name: names[pCode] || `${pCode.toUpperCase()} 服务`,
+    // 优先用后端下发的 displayName（数据库历史记录可能没有，降级用 code）
+    name: dto.displayName || `${pCode.toUpperCase()} 服务`,
     code: pCode,
     baseUrl: dto.baseUrl || '',
+    // 密钥来源：DATABASE=数据库已配置；NONE=未配置（后端已移除 env 兜底）
     apiKeyConfigured: !!dto.hasApiKey,
-    defaultModel: defaultModels[pCode] || 'default-model',
-    supportedModels: models[pCode] || [defaultModels[pCode] || 'default-model'],
+    keySource: dto.keySource || (dto.hasApiKey ? 'DATABASE' : 'NONE'),
+    defaultModel: dto.defaultModel || 'glm-4-flash',
+    supportedModels: Array.isArray(dto.supportedModels) && dto.supportedModels.length > 0
+      ? dto.supportedModels
+      : [dto.defaultModel || 'glm-4-flash'],
     status: dto.hasApiKey ? 'configured' : 'unconfigured',
     isBuiltIn: ['zhipu', 'deepseek', 'openai'].includes(pCode),
   };
