@@ -109,8 +109,18 @@
                   ></span>
                   {{ wf.status === 'published' ? '已上线' : '草稿' }}
                 </span>
-                <span v-if="wf.isPublic" class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold border border-indigo-200/80 text-[11px] whitespace-nowrap">
-                  全员公开
+                <span
+                  class="px-2 py-0.5 rounded-full font-semibold border text-[11px] whitespace-nowrap"
+                  :class="wf.isPublic
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+                    : 'bg-slate-100 text-slate-500 border-slate-200/80'"
+                  :title="canToggleVisibility(wf)
+                    ? (wf.isPublic ? '点击切换为私有（仅你和管理员可见）' : '点击切换为全员公开')
+                    : (wf.isPublic ? '全员可见' : '私有资源')"
+                  :style="canToggleVisibility(wf) ? 'cursor: pointer;' : ''"
+                  @click="canToggleVisibility(wf) && toggleWorkflowVisibility(wf)"
+                >
+                  {{ wf.isPublic ? '全员公开' : '私有' }}
                 </span>
               </div>
             </div>
@@ -272,8 +282,18 @@
                     ></span>
                     {{ wf.status === 'published' ? '已上线' : '草稿' }}
                   </span>
-                  <span v-if="wf.isPublic" class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold border border-indigo-200/80 text-[11px]">
-                    公开
+                  <span
+                    class="px-2 py-0.5 rounded-full font-semibold border text-[11px]"
+                    :class="wf.isPublic
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+                      : 'bg-slate-100 text-slate-500 border-slate-200/80'"
+                    :title="canToggleVisibility(wf)
+                      ? (wf.isPublic ? '点击切换为私有（仅你和管理员可见）' : '点击切换为全员公开')
+                      : (wf.isPublic ? '全员可见' : '私有资源')"
+                    :style="canToggleVisibility(wf) ? 'cursor: pointer;' : ''"
+                    @click="canToggleVisibility(wf) && toggleWorkflowVisibility(wf)"
+                  >
+                    {{ wf.isPublic ? '全员公开' : '私有' }}
                   </span>
                 </div>
               </td>
@@ -419,13 +439,32 @@ import { useAppStore } from '../../stores/useAppStore';
 import RunInputDialog from '../common/RunInputDialog.vue';
 import { Workflow } from '../../types';
 
-const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows, publishWorkflow, unpublishWorkflow, hasPermission } = useAppStore();
+const { state, setRoute, addWorkflow, copyWorkflow, deleteWorkflow, fetchWorkflows, publishWorkflow, unpublishWorkflow, setWorkflowVisibility, hasPermission } = useAppStore();
 
 const searchQuery = ref('');
 const statusFilter = ref('all');
 const viewMode = ref<'grid' | 'table'>('grid');
 const runDialogOpen = ref(false);
 const selectedWfForRun = ref<Workflow | null>(null);
+
+/** 判断当前用户能否切换该工作流可见性：有 update 权限 且 (本人创建 或 ADMIN) */
+function canToggleVisibility(wf: Workflow): boolean {
+  if (!hasPermission('workflow:update')) return false;
+  if (state.currentUser?.role === 'ADMIN') return true;
+  const me = state.currentUser?.displayName || state.currentUser?.username || '';
+  return !!me && wf.author === me;
+}
+
+async function toggleWorkflowVisibility(wf: Workflow) {
+  const target = !wf.isPublic;
+  const ok = window.confirm(
+    target
+      ? `确定将「${wf.name}」设为全员公开？公开后所有用户都可见并可调度该工作流。`
+      : `确定将「${wf.name}」设为私有？私有后仅你和管理员可见。`
+  );
+  if (!ok) return;
+  await setWorkflowVisibility(wf.id, target);
+}
 
 function openRunDialog(wf: Workflow) {
   selectedWfForRun.value = wf;
@@ -475,7 +514,7 @@ async function createNewWorkflow() {
     name: '新建 API 自动化协作流',
     description: '通过拖拽 Agent 算子与 MCP 工具生成自动化调度规则',
     status: 'draft',
-    isPublic: true,
+    isPublic: false,
     nodes: [
       { id: 'node-start', type: 'startNode', position: { x: 100, y: 180 }, data: { label: 'HTTP Webhook 接收' } },
       { id: 'node-end', type: 'endNode', position: { x: 500, y: 180 }, data: { label: '输出结构化结果' } },

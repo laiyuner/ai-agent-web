@@ -317,7 +317,9 @@ export function mapAgentDtoToAgent(dto: any): Agent {
     id: String(dto.id),
     name: dto.name || '',
     description: dto.description || '',
-    type: 'ReAct',
+    type: (dto as any).agentType === 'openai_functions' ? 'Functions' : 'ReAct',
+    // 执行模式：后端 agentType 缺省时兜底 react（对应旧数据/迁移默认值）
+    agentType: (dto as any).agentType || 'react',
     isPublic: !!dto.isPublic,
     llmProviderId: dto.llmProvider || '',
     llmProviderName: providerNames[dto.llmProvider] || dto.llmProvider || '通用 LLM',

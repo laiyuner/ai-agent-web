@@ -53,10 +53,23 @@
                   {{ ag.name }}
                 </h3>
                 <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5 font-mono">
-                  <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold border border-indigo-100/80 text-[10px]">
+                  <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold border border-indigo-100/80 text-[10px] shrink-0">
                     {{ ag.type }}
                   </span>
                   <span class="truncate text-[11px]">{{ ag.llmProviderName }} ({{ ag.model }})</span>
+                  <span
+                    class="px-2 py-0.5 rounded-full font-semibold border text-[10px] shrink-0"
+                    :class="ag.isPublic
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-100/80'
+                      : 'bg-slate-100 text-slate-500 border-slate-200/80'"
+                    :title="canToggleVisibility(ag)
+                      ? (ag.isPublic ? '点击切换为私有' : '点击切换为全员公开')
+                      : (ag.isPublic ? '全员可见' : '私有资源')"
+                    :style="canToggleVisibility(ag) ? 'cursor: pointer;' : ''"
+                    @click="canToggleVisibility(ag) && toggleAgentVisibility(ag)"
+                  >
+                    {{ ag.isPublic ? '公开' : '私有' }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -162,9 +175,28 @@ import { api, mapAgentDtoToAgent } from '../../api';
 import P09_AgentDrawer from './P09_AgentDrawer.vue';
 import { Agent } from '../../types';
 
-const { state, copyAgent, deleteAgent, fetchAgents, hasPermission } = useAppStore();
+const { state, copyAgent, deleteAgent, fetchAgents, setAgentVisibility, hasPermission } = useAppStore();
 
 const searchQuery = ref('');
+
+/** 判断当前用户能否切换该 Agent 可见性：有 update 权限 且 (本人创建 或 ADMIN) */
+function canToggleVisibility(ag: Agent): boolean {
+  if (!hasPermission('agent:update')) return false;
+  if (state.currentUser?.role === 'ADMIN') return true;
+  const me = state.currentUser?.displayName || state.currentUser?.username || '';
+  return !!me && ag.creator === me;
+}
+
+async function toggleAgentVisibility(ag: Agent) {
+  const target = !ag.isPublic;
+  const ok = window.confirm(
+    target
+      ? `确定将 Agent「${ag.name}」设为全员公开？公开后其他开发者可在其工作流中引用。`
+      : `确定将 Agent「${ag.name}」设为私有？私有后仅你和管理员可见。`
+  );
+  if (!ok) return;
+  await setAgentVisibility(ag.id, target);
+}
 
 let searchTimer: any = null;
 watch(searchQuery, (newVal) => {

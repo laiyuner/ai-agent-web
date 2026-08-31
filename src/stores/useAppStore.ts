@@ -966,6 +966,8 @@ export async function addAgent(agent: Omit<Agent, 'id' | 'updatedAt' | 'creator'
       retryBackoffMs: agent.retryBackoffMs ?? 1000,
       timeoutMs: (agent.timeout || 60) * 1000,
       isPublic: !!agent.isPublic,
+      // 执行模式：前端枚举 ReAct/Functions 映射为后端 agent_type 取值
+      agentType: agent.type === 'Functions' ? 'openai_functions' : 'react',
       // MCP 绑定：始终提交（[] 表示不绑定任何 MCP），mcpServerId 转数字
       mcpServers: (agent.mcpBindings || []).map((b) => ({
         mcpServerId: Number(b.mcpServerId),
@@ -999,6 +1001,7 @@ export async function updateAgent(id: string, updates: Partial<Agent>) {
     if (updates.systemPrompt !== undefined) reqData.systemPrompt = updates.systemPrompt;
     if (updates.llmProviderId !== undefined) reqData.llmProvider = updates.llmProviderId;
     if (updates.model !== undefined) reqData.llmModel = updates.model;
+    if (updates.type !== undefined) reqData.agentType = updates.type === 'Functions' ? 'openai_functions' : 'react';
     if (updates.isPublic !== undefined) reqData.isPublic = updates.isPublic;
     if (updates.temperature !== undefined || updates.maxTokens !== undefined) {
       reqData.llmParams = {
@@ -1030,6 +1033,57 @@ export async function updateAgent(id: string, updates: Partial<Agent>) {
       };
     }
     addToast({ type: 'info', title: '本地 Agent 更新', message: `服务端未响应: ${err.message}` });
+  }
+}
+
+/**
+ * 切换工作流可见性（全员公开/私有）。
+ * 走独立 PATCH 接口，PUBLISHED 状态也可切换，不受"上线不可编辑"限制。
+ * 后端校验仅 owner 或 ADMIN 可调。
+ */
+export async function setWorkflowVisibility(id: string, isPublic: boolean) {
+  if (!checkPermissionAndNotify('workflow:update')) return null;
+  try {
+    const dto = await api.updateWorkflowVisibility(id, isPublic);
+    const updated = mapWorkflowDtoToWorkflow(dto);
+    const idx = state.workflows.findIndex((w) => w.id === id);
+    if (idx !== -1) {
+      state.workflows[idx] = { ...state.workflows[idx], isPublic: updated.isPublic };
+    }
+    addToast({
+      type: 'success',
+      title: '可见性已更新',
+      message: `工作流已设为${isPublic ? '全员公开' : '私有'}`,
+    });
+    return updated;
+  } catch (err: any) {
+    addToast({ type: 'error', title: '切换可见性失败', message: err.message || '网络或服务端报错' });
+    return null;
+  }
+}
+
+/**
+ * 切换 Agent 可见性（全员公开/私有）。
+ * 后端校验仅 owner 或 ADMIN 可调。
+ */
+export async function setAgentVisibility(id: string, isPublic: boolean) {
+  if (!checkPermissionAndNotify('agent:update')) return null;
+  try {
+    const dto = await api.updateAgentVisibility(id, isPublic);
+    const updated = mapAgentDtoToAgent(dto);
+    const idx = state.agents.findIndex((a) => a.id === id);
+    if (idx !== -1) {
+      state.agents[idx] = { ...state.agents[idx], isPublic: updated.isPublic };
+    }
+    addToast({
+      type: 'success',
+      title: '可见性已更新',
+      message: `Agent 已设为${isPublic ? '全员公开' : '私有'}`,
+    });
+    return updated;
+  } catch (err: any) {
+    addToast({ type: 'error', title: '切换可见性失败', message: err.message || '网络或服务端报错' });
+    return null;
   }
 }
 
@@ -1391,6 +1445,7 @@ export function useAppStore() {
     copyWorkflow,
     publishWorkflow,
     unpublishWorkflow,
+    setWorkflowVisibility,
     validateWorkflow,
     triggerRun,
     stopRun,
@@ -1399,6 +1454,7 @@ export function useAppStore() {
     updateAgent,
     deleteAgent,
     copyAgent,
+    setAgentVisibility,
     addMcpServer,
     updateMcpServer,
     deleteMcpServer,

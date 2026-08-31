@@ -65,6 +65,18 @@
                   class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-xs"
                 ></textarea>
               </div>
+
+              <div>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    v-model="form.isPublic"
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                  />
+                  <span class="text-xs font-semibold text-slate-700">全员公开</span>
+                  <span class="text-[10px] text-slate-400 font-mono">（公开后其他用户可在其工作流中引用此 Agent）</span>
+                </label>
+              </div>
             </div>
 
             <!-- Section 2: Model & Reasoning -->
@@ -557,7 +569,7 @@ const form = ref({
   timeout: 60,
   maxRetries: 3,
   retryBackoffMs: 1000,
-  isPublic: true,
+  isPublic: false,
 });
 
 /** 当前勾选绑定的 MCP 服务器 ID 列表（checkbox v-model） */
@@ -732,7 +744,7 @@ watch(
         timeout: 60,
         maxRetries: 3,
         retryBackoffMs: 1000,
-        isPublic: true,
+        isPublic: false,
       };
       boundServerIds.value = [];
     }

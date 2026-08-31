@@ -47,6 +47,8 @@ export interface Agent {
   name: string;
   description: string;
   type: AgentType;
+  /** Agent 执行模式：react / openai_functions（原生函数调用） */
+  agentType?: string;
   isPublic: boolean;
   llmProviderId: string;
   llmProviderName: string;

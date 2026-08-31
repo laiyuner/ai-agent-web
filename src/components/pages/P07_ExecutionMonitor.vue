@@ -633,7 +633,10 @@ const totalNodeCount = computed(() => {
 });
 
 const completedNodeCount = computed(() => {
-  const completedFromStatuses = Object.values(nodeStatuses).filter((s) => s === 'SUCCESS').length;
+  // 终止也视为"已结束"：进度统计应计入终止节点，避免进度条卡在中途
+  const completedFromStatuses = Object.values(nodeStatuses).filter(
+    (s) => s === 'SUCCESS' || s === 'TERMINATED'
+  ).length;
   if (completedFromStatuses > 0) return completedFromStatuses;
   return currentRun.value?.completedNodes || 0;
 });
@@ -905,6 +908,13 @@ async function handleStopRun() {
   }
   currentRun.value.status = 'TERMINATED';
   updateRunInStore(currentRun.value.id, 'TERMINATED');
+  // 乐观收尾：run 级终止事件到达前，把仍显示 RUNNING/PENDING 的节点置为已终止
+  //（后端收尾事件最终会覆盖为准确状态，此处仅避免 UI 短暂停留在"运行中"）
+  for (const key of Object.keys(nodeStatuses)) {
+    if (nodeStatuses[key] === 'RUNNING' || nodeStatuses[key] === 'PENDING') {
+      nodeStatuses[key] = 'TERMINATED';
+    }
+  }
 }
 
 function connectWebSocket(runId: number | string, token: string) {
@@ -1072,7 +1082,9 @@ function handleWebSocketEvent(data: WebSocketEvent) {
 
     case 'NODE_FAILED': {
       const nodeKey = data.nodeKey || 'node-1';
-      nodeStatuses[nodeKey] = 'FAILED';
+      // 区分"执行失败"与"被用户终止"：后端终止事件带 terminated 标志
+      const isTerminated = Boolean(data.payload?.terminated);
+      nodeStatuses[nodeKey] = isTerminated ? 'TERMINATED' : 'FAILED';
 
       const inputVal = data.payload?.input;
       if (inputVal != null) {
@@ -1081,7 +1093,11 @@ function handleWebSocketEvent(data: WebSocketEvent) {
           : String(inputVal);
       }
 
-      addLog('error', `节点 ${nodeKey} 失败: ${data.payload?.errorMsg || '报错终止'}`, data.timestamp);
+      if (isTerminated) {
+        addLog('warn', `节点 ${nodeKey} 已终止: ${data.payload?.errorMsg || '执行被用户终止'}`, data.timestamp);
+      } else {
+        addLog('error', `节点 ${nodeKey} 失败: ${data.payload?.errorMsg || '报错终止'}`, data.timestamp);
+      }
       break;
     }
 
@@ -1215,7 +1231,7 @@ function loadHistoryData() {
       }
     }
 
-    // 日志：节点完成/失败
+    // 日志：节点完成/失败/终止
     if (nodeStatuses[key] === 'SUCCESS') {
       addLog(
         'info',
@@ -1226,6 +1242,12 @@ function loadHistoryData() {
       addLog(
         'error',
         `节点 ${key} 失败: ${nodeRun.errorMsg || nodeRun.error || '执行报错'}`,
+        nodeRun.finishedAt || nodeRun.startedAt
+      );
+    } else if (nodeStatuses[key] === 'TERMINATED') {
+      addLog(
+        'warn',
+        `节点 ${key} 已终止: ${nodeRun.errorMsg || nodeRun.error || '执行被用户终止'}`,
         nodeRun.finishedAt || nodeRun.startedAt
       );
     }
@@ -1251,6 +1273,12 @@ function loadHistoryData() {
       `工作流已被终止`,
       currentRun.value.finishedAt
     );
+    // 兜底扫尾：节点级终止事件可能因断线丢失，run 级终止时统一收口
+    for (const key of Object.keys(nodeStatuses)) {
+      if (nodeStatuses[key] === 'RUNNING' || nodeStatuses[key] === 'PENDING') {
+        nodeStatuses[key] = 'TERMINATED';
+      }
+    }
   }
 
   // 默认选中最后一个有输出的节点
