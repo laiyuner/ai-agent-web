@@ -198,14 +198,20 @@
               :stroke-width="selectedNodeKey === String(n.id) ? 2.5 : (getNodeStatus(String(n.id)) === 'RUNNING' ? 2.5 : 1.5)"
               :class="{ 'dag-node-running': getNodeStatus(String(n.id)) === 'RUNNING' }"
             />
+            <!-- 悬停显示完整名称（浏览器原生 tooltip） -->
+            <title>{{ n.data?.label ?? n.label ?? n.name ?? n.id }}</title>
             <text
               :x="(n.position?.x ?? 0) + DAG_NODE_W / 2"
-              :y="(n.position?.y ?? 0) + DAG_NODE_H / 2 + 4"
               text-anchor="middle"
               class="fill-slate-700"
               style="font-size: 12px; font-weight: 600"
             >
-              {{ getDagNodeLabel(n) }}
+              <tspan
+                v-for="(line, li) in wrapNodeLabel(n.data?.label ?? n.label ?? n.name ?? n.id)"
+                :key="li"
+                :x="(n.position?.x ?? 0) + DAG_NODE_W / 2"
+                :y="(n.position?.y ?? 0) + DAG_NODE_H / 2 + (wrapNodeLabel(n.data?.label ?? n.label ?? n.name ?? n.id).length === 1 ? 4 : (li === 0 ? -2 : 12))"
+              >{{ line }}</tspan>
             </text>
           </g>
         </svg>
@@ -822,11 +828,48 @@ function dagEdgePath(e: any): string {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
-/** 节点标签提取：保证 string 且安全截断 */
-function getDagNodeLabel(n: any): string {
-  if (!n) return '';
-  const label = n.data?.label ?? n.label ?? n.name ?? n.id ?? '';
-  return String(label).slice(0, 10);
+/** 标签视觉宽度：CJK 全角字符计 2，半角计 1（12px 字号下的近似宽度单位） */
+function labelVisualWidth(ch: string): number {
+  const code = ch.codePointAt(0) || 0;
+  // CJK 统一表意文字 + 全角标点 + CJK 符号等按 2 计
+  const isCJK = (code >= 0x2E80 && code <= 0x9FFF)
+    || (code >= 0xF900 && code <= 0xFAFF)
+    || (code >= 0xFF00 && code <= 0xFF60)
+    || (code >= 0x3000 && code <= 0x303F);
+  return isCJK ? 2 : 1;
+}
+
+/**
+ * 把节点名称折行为最多 2 行的数组。
+ * 每行视觉宽度 ≤ 16 单位（约 8 个汉字 / 16 个半角字符）；
+ * 两行仍放不下时第二行末尾以 … 截断。
+ */
+function wrapNodeLabel(label: string): string[] {
+  const text = String(label || '').trim();
+  if (!text) return [''];
+  const MAX_PER_LINE = 16;
+  const lines: string[] = [];
+  let current = '';
+  let currentW = 0;
+  for (const ch of text) {
+    const w = labelVisualWidth(ch);
+    if (currentW + w > MAX_PER_LINE) {
+      lines.push(current);
+      current = ch;
+      currentW = w;
+      if (lines.length === 2) break;   // 最多 2 行，剩余交给省略号
+    } else {
+      current += ch;
+      currentW += w;
+    }
+  }
+  if (lines.length < 2 && current) lines.push(current);
+  // 未耗尽原文（还有字符没排进去）→ 第二行末尾加省略号
+  const consumed = lines.join('');
+  if (consumed.length < text.length && lines.length === 2) {
+    lines[1] = lines[1].slice(0, -1) + '…';
+  }
+  return lines.slice(0, 2);
 }
 
 /** 节点状态 → 填充色（Tailwind 色板十六进制） */
