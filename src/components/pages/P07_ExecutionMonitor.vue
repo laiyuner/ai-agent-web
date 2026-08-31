@@ -107,30 +107,108 @@
         <div class="text-2xl font-extrabold text-slate-900 font-mono">
           {{ completedNodeCount }} / {{ totalNodeCount }}
         </div>
-        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-1">
+        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-1 flex">
           <div
-            class="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-            :style="{ width: ((completedNodeCount / (totalNodeCount || 1)) * 100) + '%' }"
+            v-for="seg in progressSegments"
+            :key="seg.key"
+            :class="seg.cls"
+            class="h-2 transition-all duration-300"
+            :style="{ width: seg.pct + '%' }"
           ></div>
+        </div>
+        <div
+          v-if="nodeStatCounts.success + nodeStatCounts.failed + nodeStatCounts.terminated > 0"
+          class="text-[11px] text-slate-400"
+        >
+          成功 {{ nodeStatCounts.success }} · 失败 {{ nodeStatCounts.failed }} · 终止 {{ nodeStatCounts.terminated }}
         </div>
       </div>
 
       <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-1.5">
         <div class="text-xs font-bold text-slate-400">总耗时 (Duration)</div>
-        <div class="text-2xl font-extrabold text-slate-900 font-mono">{{ currentRun.durationMs || 0 }} ms</div>
+        <div class="text-2xl font-extrabold text-slate-900 font-mono">{{ formatDuration(displayDurationMs) }}</div>
         <div class="text-xs text-slate-400 font-mono">开始于: {{ formattedStartTime }}</div>
       </div>
 
       <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-1.5">
         <div class="text-xs font-bold text-slate-400">Token 总用量</div>
-        <div class="text-2xl font-extrabold text-indigo-600 font-mono">{{ totalTokensUsed }}</div>
+        <div class="text-2xl font-extrabold text-indigo-600 font-mono">{{ formatTokens(totalTokensUsed) }}</div>
         <div class="text-xs text-indigo-400">包含 LLM 输入及打字机输出</div>
       </div>
 
       <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-1.5">
         <div class="text-xs font-bold text-slate-400">触发方式</div>
         <div class="text-2xl font-extrabold text-slate-900 uppercase font-mono">{{ currentRun.triggerType || 'MANUAL' }}</div>
-        <div class="text-xs text-slate-400 font-mono">触发状态: {{ currentRun.status }}</div>
+        <div class="text-xs text-slate-400">触发人: {{ currentRun.ownerName || currentRun.creatorName || '-' }}</div>
+      </div>
+    </div>
+
+    <!-- Workflow Topology (read-only mini-DAG) -->
+    <div
+      v-if="workflowNodes.length > 0"
+      class="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3"
+    >
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2 text-slate-900 font-bold text-sm">
+          <GitFork class="w-4 h-4 text-indigo-600" />
+          <span>工作流拓扑</span>
+          <span class="text-[11px] text-slate-400 font-normal">点击节点联动右侧输入/输出详情</span>
+        </div>
+        <!-- 图例 -->
+        <div class="flex items-center gap-3 text-[11px] text-slate-500">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-200 border border-emerald-500"></span>成功</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-500"></span>运行中</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-500"></span>失败</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-400"></span>未跑/终止</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <svg
+          v-if="dagLayout"
+          :viewBox="`${dagLayout.viewX} ${dagLayout.viewY} ${dagLayout.width} ${dagLayout.height}`"
+          class="w-full h-56 min-w-[480px]"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <!-- 边：条件边虚线，普通边实线 -->
+          <path
+            v-for="e in workflowEdges"
+            :key="e.id"
+            :d="dagEdgePath(e)"
+            fill="none"
+            :stroke="getNodeStatus(e.source) === 'SUCCESS' ? '#94a3b8' : '#cbd5e1'"
+            :stroke-width="getNodeStatus(e.source) === 'SUCCESS' ? 2 : 1.5"
+            :stroke-dasharray="e.condition ? '6 4' : undefined"
+          />
+          <!-- 节点 -->
+          <g
+            v-for="n in workflowNodes"
+            :key="n.id"
+            class="cursor-pointer"
+            @click="selectedNodeKey = n.id"
+          >
+            <rect
+              :x="n.position?.x ?? 0"
+              :y="n.position?.y ?? 0"
+              :width="DAG_NODE_W"
+              :height="DAG_NODE_H"
+              rx="10"
+              :fill="dagStatusFill(n.id)"
+              :stroke="selectedNodeKey === n.id ? '#6366f1' : dagStatusStroke(n.id)"
+              :stroke-width="selectedNodeKey === n.id ? 2.5 : (getNodeStatus(n.id) === 'RUNNING' ? 2.5 : 1.5)"
+              :class="{ 'dag-node-running': getNodeStatus(n.id) === 'RUNNING' }"
+            />
+            <text
+              :x="(n.position?.x ?? 0) + DAG_NODE_W / 2"
+              :y="(n.position?.y ?? 0) + DAG_NODE_H / 2 + 4"
+              text-anchor="middle"
+              class="fill-slate-700"
+              style="font-size: 12px; font-weight: 600"
+            >
+              {{ (n.data?.label || n.id).slice(0, 10) }}
+            </text>
+          </g>
+        </svg>
       </div>
     </div>
 
@@ -179,13 +257,32 @@
               </span>
             </div>
 
-            <div class="flex items-center justify-between text-xs text-slate-500 font-mono pt-1">
-              <span>耗时: {{ nodeDurations[node.nodeKey] || node.durationMs || 0 }}ms</span>
-              <span>Tokens: {{ nodeTokens[node.nodeKey] || node.tokens || 0 }}</span>
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>耗时: <span class="font-mono">{{ getNodeStatus(node.nodeKey) === 'PENDING' ? '-' : `${nodeDurations[node.nodeKey] || node.durationMs || 0}ms` }}</span></span>
+              <span>Tokens: <span class="font-mono">{{ getNodeStatus(node.nodeKey) === 'PENDING' ? '-' : formatTokens(nodeTokens[node.nodeKey] || node.tokens || 0) }}</span></span>
+            </div>
+
+            <!-- 性能指标：首token延迟 / LLM轮数 / 工具耗时（后端埋点，0=未采集则隐藏） -->
+            <div
+              v-if="getNodeStatus(node.nodeKey) === 'SUCCESS' && (nodeFirstTokenMs[node.nodeKey] || nodeLlmRounds[node.nodeKey] || nodeToolTimeMs[node.nodeKey])"
+              class="flex items-center gap-3 text-[11px] text-slate-400 pt-0.5"
+            >
+              <span v-if="nodeFirstTokenMs[node.nodeKey]">首token <span class="font-mono">{{ nodeFirstTokenMs[node.nodeKey] }}ms</span></span>
+              <span v-if="nodeLlmRounds[node.nodeKey]">LLM <span class="font-mono">{{ nodeLlmRounds[node.nodeKey] }}轮</span></span>
+              <span v-if="nodeToolTimeMs[node.nodeKey]">工具 <span class="font-mono">{{ formatDuration(nodeToolTimeMs[node.nodeKey]) }}</span></span>
             </div>
 
             <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
               <span>开始: {{ formatNodeStartTime(node.startedAt) }}</span>
+            </div>
+
+            <!-- 失败/终止原因摘要：单行截断，hover 显示全文 -->
+            <div
+              v-if="nodeErrors[node.nodeKey]"
+              class="text-[11px] text-rose-500 truncate pt-0.5"
+              :title="nodeErrors[node.nodeKey]"
+            >
+              {{ nodeErrors[node.nodeKey] }}
             </div>
 
             <!-- Typewriter stream badge -->
@@ -246,6 +343,16 @@
                   </button>
 
                   <button
+                    @click="isInputExpanded = !isInputExpanded"
+                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                    :title="isInputExpanded ? '收起输入区域' : '展开输入区域'"
+                  >
+                    <ChevronUp v-if="isInputExpanded" class="w-3.5 h-3.5" />
+                    <ChevronDown v-else class="w-3.5 h-3.5" />
+                    <span>{{ isInputExpanded ? '收起' : '展开' }}</span>
+                  </button>
+
+                  <button
                     @click="openModal('输入内容 (' + selectedNodeKey + ')', currentSelectedNodeInput)"
                     class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                     title="弹窗全屏查看全部"
@@ -258,7 +365,8 @@
 
               <!-- Input Code Container (Fixed Flat Height with Internal Scrollbar) -->
               <div
-                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden h-30 flex flex-col"
+                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden flex flex-col"
+                :class="isInputExpanded ? 'h-[60vh]' : 'min-h-30 max-h-64'"
               >
                 <div class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text">
                   <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeInput }}</pre>
@@ -278,6 +386,24 @@
                 </span>
 
                 <div class="flex items-center gap-1.5">
+                  <!-- 原文 / 渲染 切换 -->
+                  <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      @click="isMarkdownView = false"
+                      class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
+                      :class="!isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
+                    >
+                      原文
+                    </button>
+                    <button
+                      @click="isMarkdownView = true"
+                      class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
+                      :class="isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
+                    >
+                      渲染
+                    </button>
+                  </div>
+
                   <button
                     @click="copyText(currentSelectedNodeOutput, 'output')"
                     class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
@@ -285,6 +411,16 @@
                   >
                     <Check v-if="copiedState === 'output'" class="w-3.5 h-3.5 text-emerald-600" />
                     <Copy v-else class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    @click="isOutputExpanded = !isOutputExpanded"
+                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                    :title="isOutputExpanded ? '收起输出区域' : '展开输出区域'"
+                  >
+                    <ChevronUp v-if="isOutputExpanded" class="w-3.5 h-3.5" />
+                    <ChevronDown v-else class="w-3.5 h-3.5" />
+                    <span>{{ isOutputExpanded ? '收起' : '展开' }}</span>
                   </button>
 
                   <button
@@ -300,13 +436,26 @@
 
               <!-- Output Code Container (Fixed Flat Height with Internal Scrollbar) -->
               <div
-                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden h-30 flex flex-col"
+                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden flex flex-col"
+                :class="isOutputExpanded ? 'h-[60vh]' : (getNodeStatus(selectedNodeKey) === 'RUNNING' ? 'h-64' : 'min-h-30 max-h-64')"
               >
                 <div
                   ref="outputContainer"
                   class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
+                  :class="isMarkdownView ? 'bg-slate-950' : ''"
                 >
-                  <pre class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
+                  <!-- 渲染视图：Markdown → HTML（DOMPurify 已消毒） -->
+                  <div
+                    v-if="isMarkdownView"
+                    class="md-body text-xs"
+                    v-html="renderedOutputHtml"
+                  ></div>
+                  <!-- 原文视图：打字机流式 -->
+                  <pre
+                    v-else
+                    v-memo="[currentSelectedNodeOutput, getNodeStatus(selectedNodeKey)]"
+                    class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text"
+                  >{{ displayNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
                 </div>
               </div>
             </div>
@@ -435,6 +584,7 @@
     <div
       v-if="isModalOpen"
       class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+      @click.self="closeModal"
     >
       <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         <!-- Modal Header -->
@@ -484,16 +634,15 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
+import MarkdownIt from 'markdown-it';
+import DOMPurify from 'dompurify';
 import {
   ArrowLeft,
   Activity,
   GitFork,
   Square,
-  RotateCcw,
   Terminal,
   FileCode,
-  FileText,
-  Download,
   Wifi,
   WifiOff,
   Cpu,
@@ -518,6 +667,10 @@ const isInputExpanded = ref(false);
 const isOutputExpanded = ref(false);
 const copiedState = ref<string | null>(null);
 
+// 输出 Markdown 渲染视图（默认原文，打字机流式期间观感更好且渲染开销低）
+const isMarkdownView = ref(false);
+const markdownRenderer = new MarkdownIt({ breaks: true, linkify: true });
+
 const logContainer = ref<HTMLDivElement | null>(null);
 const outputContainer = ref<HTMLDivElement | null>(null);
 
@@ -531,6 +684,25 @@ const modalContent = ref('');
 // Current Run record from Backend API or Store
 const currentRun = ref<any>(null);
 const isFetchingRun = ref(false);
+
+// 工作流拓扑数据（只读 DAG 渲染）：来自 api.getWorkflow，节点 id 即 nodeKey
+const workflowNodes = ref<any[]>([]);
+const workflowEdges = ref<any[]>([]);
+
+/** 拉取工作流快照渲染拓扑图；失败静默降级（不影响其余监控功能） */
+async function loadWorkflowTopology() {
+  const wfId = currentRun.value?.workflowId;
+  if (!wfId || workflowNodes.value.length > 0) return;
+  try {
+    const wf = await api.getWorkflow(wfId);
+    if (wf && Array.isArray(wf.nodes)) {
+      workflowNodes.value = wf.nodes;
+      workflowEdges.value = Array.isArray(wf.edges) ? wf.edges : [];
+    }
+  } catch (err) {
+    console.warn('拉取工作流拓扑失败（拓扑图将不显示，其余功能不受影响）:', err);
+  }
+}
 
 // WebSocket Status state
 const ws = ref<WebSocket | null>(null);
@@ -547,6 +719,12 @@ const nodeOutputs = reactive<Record<string, string>>({});   // nodeKey -> typewr
 const nodeInputs = reactive<Record<string, string>>({});    // nodeKey -> input json text
 const nodeTokens = reactive<Record<string, number>>({});    // nodeKey -> tokens used
 const nodeDurations = reactive<Record<string, number>>({}); // nodeKey -> duration ms
+const nodeErrors = reactive<Record<string, string>>({});   // nodeKey -> 失败/终止原因摘要
+
+// 节点性能指标（来自 tokensUsed 的 first_token_ms / llm_rounds / tool_time_ms；0 = 未采集）
+const nodeFirstTokenMs = reactive<Record<string, number>>({});
+const nodeLlmRounds = reactive<Record<string, number>>({});
+const nodeToolTimeMs = reactive<Record<string, number>>({});
 
 // Logs list
 const logs = reactive<Array<{ time: string; level: string; message: string }>>([]);
@@ -589,6 +767,77 @@ function formatNodeStartTime(startedAt?: string | null): string {
     return startedAt.slice(0, 8);
   } catch {
     return '-';
+  }
+}
+
+/** 毫秒转人性化时长：987ms → "987ms"；65s → "1m 5s"；3700s → "1h 1m" */
+function formatDuration(ms: number): string {
+  if (!ms || ms < 0) return '0s';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** Token 千分位：12345 → "12,345"；123500 → "123.5k" */
+function formatTokens(n: number): string {
+  if (n == null || isNaN(n)) return '0';
+  if (n >= 100000) return `${(n / 1000).toFixed(1)}k`;
+  return n.toLocaleString('en-US');
+}
+
+// ============ mini-DAG 渲染辅助 ============
+const DAG_NODE_W = 120;   // 节点框宽（SVG 用户单位）
+const DAG_NODE_H = 44;    // 节点框高
+
+/** viewBox 自适应：按节点画布坐标计算包围盒（含 padding） */
+const dagLayout = computed(() => {
+  const nodes = workflowNodes.value;
+  if (nodes.length === 0) return null;
+  const PAD = 40;
+  const xs = nodes.map((n: any) => n.position?.x ?? 0);
+  const ys = nodes.map((n: any) => n.position?.y ?? 0);
+  const minX = Math.min(...xs) - PAD;
+  const minY = Math.min(...ys) - PAD;
+  const maxX = Math.max(...xs) + DAG_NODE_W + PAD;
+  const maxY = Math.max(...ys) + DAG_NODE_H + PAD;
+  return { viewX: minX, viewY: minY, width: maxX - minX, height: maxY - minY };
+});
+
+/** 边路径：水平三次贝塞尔（源右侧 → 目标左侧） */
+function dagEdgePath(e: any): string {
+  const s = workflowNodes.value.find((n: any) => n.id === e.source);
+  const t = workflowNodes.value.find((n: any) => n.id === e.target);
+  if (!s || !t) return '';
+  const x1 = (s.position?.x ?? 0) + DAG_NODE_W;
+  const y1 = (s.position?.y ?? 0) + DAG_NODE_H / 2;
+  const x2 = t.position?.x ?? 0;
+  const y2 = (t.position?.y ?? 0) + DAG_NODE_H / 2;
+  const dx = Math.max(40, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+}
+
+/** 节点状态 → 填充色（Tailwind 色板十六进制） */
+function dagStatusFill(nodeKey: string): string {
+  switch (getNodeStatus(nodeKey)) {
+    case 'SUCCESS': return '#d1fae5';      // emerald-100
+    case 'RUNNING': return '#fef3c7';      // amber-100
+    case 'FAILED': return '#ffe4e6';       // rose-100
+    case 'TERMINATED': return '#f1f5f9';   // slate-100
+    default: return '#f8fafc';             // slate-50（PENDING）
+  }
+}
+
+/** 节点状态 → 描边色 */
+function dagStatusStroke(nodeKey: string): string {
+  switch (getNodeStatus(nodeKey)) {
+    case 'SUCCESS': return '#10b981';
+    case 'RUNNING': return '#f59e0b';
+    case 'FAILED': return '#f43f5e';
+    case 'TERMINATED': return '#94a3b8';
+    default: return '#cbd5e1';
   }
 }
 
@@ -639,6 +888,64 @@ const completedNodeCount = computed(() => {
   ).length;
   if (completedFromStatuses > 0) return completedFromStatuses;
   return currentRun.value?.completedNodes || 0;
+});
+
+// 运行中时长跳动：每秒更新 nowTick，驱动 displayDurationMs 重算
+const nowTick = ref(Date.now());
+let elapsedTimer: any = null;
+
+watch(
+  () => currentRun.value?.status,
+  (status) => {
+    const running = (status || '').toUpperCase() === 'RUNNING';
+    if (running && elapsedTimer == null) {
+      elapsedTimer = window.setInterval(() => { nowTick.value = Date.now(); }, 1000);
+    } else if (!running && elapsedTimer != null) {
+      clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+  },
+  { immediate: true }
+);
+
+// 展示用时：运行中 = 当前时间 - 开始时间（每秒跳动）；已结束 = 后端 durationMs
+const displayDurationMs = computed(() => {
+  const status = (currentRun.value?.status || '').toUpperCase();
+  if (status === 'RUNNING' && currentRun.value?.startTime) {
+    const start = new Date(currentRun.value.startTime).getTime();
+    if (!isNaN(start)) return Math.max(0, nowTick.value - start);
+  }
+  return currentRun.value?.durationMs || 0;
+});
+
+// 节点终态计数（分段进度条 + 图例数据源）
+const nodeStatCounts = computed(() => {
+  const counts = { success: 0, failed: 0, terminated: 0 };
+  for (const s of Object.values(nodeStatuses)) {
+    if (s === 'SUCCESS') counts.success++;
+    else if (s === 'FAILED') counts.failed++;
+    else if (s === 'TERMINATED') counts.terminated++;
+  }
+  return counts;
+});
+
+// 分段进度条：成功绿 / 失败红 / 终止灰；无节点明细时退化为整体单色条（兼容 store 兜底数据）
+const progressSegments = computed(() => {
+  const c = nodeStatCounts.value;
+  const hasDetail = c.success + c.failed + c.terminated > 0;
+  if (!hasDetail) {
+    return [{
+      key: 'done',
+      cls: 'bg-indigo-600',
+      pct: (completedNodeCount.value / (totalNodeCount.value || 1)) * 100,
+    }];
+  }
+  const total = totalNodeCount.value || 1;
+  return [
+    { key: 'success', cls: 'bg-emerald-500', pct: (c.success / total) * 100 },
+    { key: 'failed', cls: 'bg-rose-500', pct: (c.failed / total) * 100 },
+    { key: 'terminated', cls: 'bg-slate-400', pct: (c.terminated / total) * 100 },
+  ];
 });
 
 const totalTokensUsed = computed(() => {
@@ -705,6 +1012,22 @@ const currentSelectedNodeOutput = computed(() => {
   if (nodeOutputs[selectedNodeKey.value]) return nodeOutputs[selectedNodeKey.value];
   const found = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
   return found?.outputJson || currentRun.value?.output || '等待输出...';
+});
+
+// 超长输出渲染保护：仅渲染末尾 100KB，复制/全屏仍走完整文本
+const MAX_RENDER_CHARS = 100 * 1024;
+const displayNodeOutput = computed(() => {
+  const text = currentSelectedNodeOutput.value;
+  if (!text || text.length <= MAX_RENDER_CHARS) return text;
+  return `…（内容超长，前 ${text.length - MAX_RENDER_CHARS} 字符已折叠，点击"全屏"或"复制"获取完整内容）\n${text.slice(-MAX_RENDER_CHARS)}`;
+});
+
+/** 渲染输出 HTML（DOMPurify 消毒防 XSS；仅渲染视图激活时才计算） */
+const renderedOutputHtml = computed(() => {
+  if (!isMarkdownView.value) return '';
+  const text = displayNodeOutput.value || '';
+  if (!text) return '';
+  return DOMPurify.sanitize(markdownRenderer.render(text));
 });
 
 // All nodes for Output Display Area Tabs
@@ -1034,6 +1357,10 @@ function connectWebSocket(runId: number | string, token: string) {
   };
 }
 
+// 打字机流式增量合并缓冲（30ms 节流合并，避免高频 chunks 导致过度渲染）
+const chunkBuffers: Record<string, string[]> = {};
+let chunkFlushTimer: any = null;
+
 function handleWebSocketEvent(data: WebSocketEvent) {
   if (!currentRun.value) return;
 
@@ -1054,6 +1381,7 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'RUNNING';
       nodeOutputs[nodeKey] = '';
+      delete nodeErrors[nodeKey];
       if (!selectedNodeKey.value) selectedNodeKey.value = nodeKey;
 
       if (data.payload?.input) {
@@ -1070,7 +1398,23 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     case 'OUTPUT_CHUNK': {
       const nodeKey = data.nodeKey || selectedNodeKey.value || 'node-1';
       const chunk = data.payload?.chunk || '';
-      nodeOutputs[nodeKey] = (nodeOutputs[nodeKey] || '') + chunk;
+      
+      if (!chunkBuffers[nodeKey]) {
+        chunkBuffers[nodeKey] = [];
+      }
+      chunkBuffers[nodeKey].push(chunk);
+
+      if (chunkFlushTimer == null) {
+        chunkFlushTimer = setTimeout(() => {
+          for (const [k, chunks] of Object.entries(chunkBuffers)) {
+            if (chunks.length > 0) {
+              nodeOutputs[k] = (nodeOutputs[k] || '') + chunks.join('');
+              chunks.length = 0;
+            }
+          }
+          chunkFlushTimer = null;
+        }, 30);
+      }
 
       if (!selectedNodeKey.value) {
         selectedNodeKey.value = nodeKey;
@@ -1092,6 +1436,13 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     case 'NODE_FINISHED': {
       const nodeKey = data.nodeKey || 'node-1';
       nodeStatuses[nodeKey] = 'SUCCESS';
+      delete nodeErrors[nodeKey];
+
+      // 刷新该节点残留的缓冲区
+      if (chunkBuffers[nodeKey] && chunkBuffers[nodeKey].length > 0) {
+        nodeOutputs[nodeKey] = (nodeOutputs[nodeKey] || '') + chunkBuffers[nodeKey].join('');
+        chunkBuffers[nodeKey].length = 0;
+      }
       
       const tokensUsed = data.payload?.tokensUsed;
       const totalTokens = typeof tokensUsed === 'object' && tokensUsed !== null
@@ -1099,6 +1450,13 @@ function handleWebSocketEvent(data: WebSocketEvent) {
         : (typeof tokensUsed === 'number' ? tokensUsed : 0);
       nodeTokens[nodeKey] = totalTokens;
       nodeDurations[nodeKey] = data.payload?.durationMs || 0;
+
+      // 性能指标解析（0 / undefined = 未采集）
+      if (typeof tokensUsed === 'object' && tokensUsed !== null) {
+        if (tokensUsed.first_token_ms) nodeFirstTokenMs[nodeKey] = Number(tokensUsed.first_token_ms);
+        if (tokensUsed.llm_rounds) nodeLlmRounds[nodeKey] = Number(tokensUsed.llm_rounds);
+        if (tokensUsed.tool_time_ms) nodeToolTimeMs[nodeKey] = Number(tokensUsed.tool_time_ms);
+      }
 
       const inputVal = data.payload?.input;
       if (inputVal != null) {
@@ -1108,11 +1466,11 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       }
 
       const finalOutput = data.payload?.output;
-      nodeOutputs[nodeKey] = finalOutput == null
-        ? ''
-        : (typeof finalOutput === 'object'
-           ? JSON.stringify(finalOutput, null, 2)
-           : String(finalOutput));
+      if (finalOutput != null) {
+        nodeOutputs[nodeKey] = typeof finalOutput === 'object'
+          ? JSON.stringify(finalOutput, null, 2)
+          : String(finalOutput);
+      }
 
       addLog('info', `节点 ${nodeKey} 完成，Token: ${totalTokens}`, data.timestamp);
       break;
@@ -1124,6 +1482,12 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       const isTerminated = Boolean(data.payload?.terminated);
       nodeStatuses[nodeKey] = isTerminated ? 'TERMINATED' : 'FAILED';
 
+      // 刷新该节点残留的缓冲区
+      if (chunkBuffers[nodeKey] && chunkBuffers[nodeKey].length > 0) {
+        nodeOutputs[nodeKey] = (nodeOutputs[nodeKey] || '') + chunkBuffers[nodeKey].join('');
+        chunkBuffers[nodeKey].length = 0;
+      }
+
       const inputVal = data.payload?.input;
       if (inputVal != null) {
         nodeInputs[nodeKey] = typeof inputVal === 'object'
@@ -1131,10 +1495,13 @@ function handleWebSocketEvent(data: WebSocketEvent) {
           : String(inputVal);
       }
 
+      const errText = data.payload?.errorMsg || (isTerminated ? '执行被用户终止' : '执行报错');
+      nodeErrors[nodeKey] = errText;
+
       if (isTerminated) {
-        addLog('warn', `节点 ${nodeKey} 已终止: ${data.payload?.errorMsg || '执行被用户终止'}`, data.timestamp);
+        addLog('warn', `节点 ${nodeKey} 已终止: ${errText}`, data.timestamp);
       } else {
-        addLog('error', `节点 ${nodeKey} 失败: ${data.payload?.errorMsg || '报错终止'}`, data.timestamp);
+        addLog('error', `节点 ${nodeKey} 失败: ${errText}`, data.timestamp);
       }
       break;
     }
@@ -1240,11 +1607,15 @@ function loadHistoryData() {
         : String(nodeRun.inputJson);
     }
 
-    // Token 用量
-    if (nodeRun.tokensUsed) {
-      nodeTokens[key] = typeof nodeRun.tokensUsed === 'object'
-        ? (nodeRun.tokensUsed.totalTokens || 0)
-        : Number(nodeRun.tokensUsed);
+    // Token 用量及性能指标
+    if (nodeRun.tokensUsed && typeof nodeRun.tokensUsed === 'object') {
+      const tu = nodeRun.tokensUsed;
+      nodeTokens[key] = tu.totalTokens || tu.total_tokens || 0;
+      if (tu.first_token_ms) nodeFirstTokenMs[key] = Number(tu.first_token_ms);
+      if (tu.llm_rounds) nodeLlmRounds[key] = Number(tu.llm_rounds);
+      if (tu.tool_time_ms) nodeToolTimeMs[key] = Number(tu.tool_time_ms);
+    } else if (nodeRun.tokensUsed) {
+      nodeTokens[key] = Number(nodeRun.tokensUsed);
     } else if (nodeRun.tokens) {
       nodeTokens[key] = nodeRun.tokens;
     }
@@ -1256,6 +1627,11 @@ function loadHistoryData() {
       const start = new Date(nodeRun.startedAt).getTime();
       const end = new Date(nodeRun.finishedAt).getTime();
       nodeDurations[key] = Math.max(0, end - start);
+    }
+
+    // 错误信息
+    if (nodeRun.errorMsg || nodeRun.error) {
+      nodeErrors[key] = nodeRun.errorMsg || nodeRun.error;
     }
 
     // 日志：工具调用记录
@@ -1326,8 +1702,16 @@ function loadHistoryData() {
   }
 }
 
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isModalOpen.value) {
+    closeModal();
+  }
+}
+
 // Initialization Lifecycle
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown);
+
   const runId = state.selectedRunId || (state.runs[0] ? state.runs[0].id : null);
   if (!runId) {
     isFetchingRun.value = false;
@@ -1371,6 +1755,9 @@ onMounted(async () => {
     return;
   }
 
+  // 加载只读工作流拓扑结构
+  loadWorkflowTopology();
+
   // Initialize node states map & select first node
   if (nodeList.value.length > 0 && !selectedNodeKey.value) {
     selectedNodeKey.value = nodeList.value[0].nodeKey;
@@ -1396,6 +1783,93 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+  if (chunkFlushTimer) {
+    clearTimeout(chunkFlushTimer);
+    chunkFlushTimer = null;
+  }
   disconnect();
 });
 </script>
+
+<style scoped>
+@keyframes dag-pulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.3; }
+}
+.dag-node-running {
+  animation: dag-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+:deep(.md-body) {
+  color: #e2e8f0;
+  line-height: 1.6;
+  font-family: inherit;
+}
+:deep(.md-body h1), :deep(.md-body h2), :deep(.md-body h3) {
+  color: #f8fafc;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+:deep(.md-body h1) { font-size: 1.25rem; }
+:deep(.md-body h2) { font-size: 1.1rem; }
+:deep(.md-body h3) { font-size: 0.95rem; }
+:deep(.md-body p) { margin-bottom: 0.75rem; }
+:deep(.md-body ul), :deep(.md-body ol) {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+:deep(.md-body ul) { list-style-type: disc; }
+:deep(.md-body ol) { list-style-type: decimal; }
+:deep(.md-body li) { margin-bottom: 0.25rem; }
+:deep(.md-body code) {
+  background-color: #0f172a;
+  color: #6ee7b7;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, monospace;
+}
+:deep(.md-body pre) {
+  background-color: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+:deep(.md-body pre code) {
+  background: transparent;
+  padding: 0;
+  color: #a7f3d0;
+}
+:deep(.md-body blockquote) {
+  border-left: 3px solid #6366f1;
+  padding-left: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 0.75rem;
+}
+:deep(.md-body a) {
+  color: #818cf8;
+  text-decoration: underline;
+}
+:deep(.md-body table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+}
+:deep(.md-body th), :deep(.md-body td) {
+  border: 1px solid #334155;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+:deep(.md-body th) {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+</style>
