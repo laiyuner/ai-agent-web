@@ -124,7 +124,7 @@
             </div>
             <div>
               <span class="block text-slate-400 text-[10px]">绑定 MCP</span>
-              <span class="font-bold text-indigo-600">{{ ag.boundTools.length }} 个</span>
+              <span class="font-bold text-indigo-600">{{ (ag.mcpBindings || []).length }} 个</span>
             </div>
           </div>
         </div>
