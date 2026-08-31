@@ -145,8 +145,8 @@
 
     <!-- Workflow Topology (read-only mini-DAG) -->
     <div
-      v-if="workflowNodes.length > 0"
-      class="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3"
+      v-if="!topologyFetchFailed && (currentRun?.workflowId || isFetchingTopology || workflowNodes.length > 0)"
+      class="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3 transition-all duration-300"
     >
       <div class="flex items-center justify-between pb-2 border-b border-slate-100">
         <div class="flex items-center gap-2 text-slate-900 font-bold text-sm">
@@ -154,8 +154,12 @@
           <span>工作流拓扑</span>
           <span class="text-[11px] text-slate-400 font-normal">点击节点联动右侧输入/输出详情</span>
         </div>
-        <!-- 图例 -->
-        <div class="flex items-center gap-3 text-[11px] text-slate-500">
+        <!-- 图例 / 加载状态提示 -->
+        <div v-if="isFetchingTopology && workflowNodes.length === 0" class="flex items-center gap-1.5 text-xs text-indigo-500 font-medium">
+          <Loader2 class="w-3.5 h-3.5 animate-spin" />
+          <span>加载拓扑中...</span>
+        </div>
+        <div v-else class="flex items-center gap-3 text-[11px] text-slate-500">
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-200 border border-emerald-500"></span>成功</span>
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-500"></span>运行中</span>
           <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-rose-100 border border-rose-500"></span>失败</span>
@@ -163,7 +167,27 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
+      <!-- 骨架占位态：固定 h-56 高度，消除首次进入页面时元素突现导致的下推抖动 (Layout Shift) -->
+      <div
+        v-if="isFetchingTopology && workflowNodes.length === 0"
+        class="w-full h-56 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200/80 flex items-center justify-center relative overflow-hidden"
+      >
+        <!-- 骨架节点与连线模拟占位 -->
+        <div class="absolute inset-0 flex items-center justify-around px-8 opacity-45 pointer-events-none animate-pulse">
+          <div class="w-28 h-11 rounded-xl bg-slate-200/90 border border-slate-300/60 shadow-xs"></div>
+          <div class="w-16 h-0.5 bg-slate-300"></div>
+          <div class="w-28 h-11 rounded-xl bg-slate-200/90 border border-slate-300/60 shadow-xs"></div>
+          <div class="w-16 h-0.5 bg-slate-300"></div>
+          <div class="w-28 h-11 rounded-xl bg-slate-200/90 border border-slate-300/60 shadow-xs"></div>
+        </div>
+        <div class="z-10 text-xs text-slate-500 font-medium flex items-center gap-2 bg-white/90 px-3.5 py-1.5 rounded-xl border border-slate-200/80 shadow-xs backdrop-blur-xs">
+          <Loader2 class="w-3.5 h-3.5 text-indigo-600 animate-spin" />
+          <span>正在构建工作流拓扑...</span>
+        </div>
+      </div>
+
+      <!-- 真实 DAG 拓扑图：平滑渐入 -->
+      <div v-else-if="workflowNodes.length > 0" class="overflow-x-auto transition-opacity duration-300">
         <svg
           v-if="dagLayout"
           :viewBox="`${dagLayout.viewX} ${dagLayout.viewY} ${dagLayout.width} ${dagLayout.height}`"
@@ -654,6 +678,7 @@ import {
   Check,
   Search,
   X,
+  Loader2,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
 import { api, tokenManager, mapRunDtoToRunRecord, mapWorkflowDtoToWorkflow } from '../../api';
@@ -687,22 +712,31 @@ const isFetchingRun = ref(false);
 // 工作流拓扑数据（只读 DAG 渲染）：来自 api.getWorkflow，节点 id 即 nodeKey
 const workflowNodes = ref<any[]>([]);
 const workflowEdges = ref<any[]>([]);
+const isFetchingTopology = ref(false);
+const topologyFetchFailed = ref(false);
 
 /** 拉取工作流快照渲染拓扑图；失败静默降级（不影响其余监控功能） */
 async function loadWorkflowTopology() {
   const wfId = currentRun.value?.workflowId;
-  if (!wfId || workflowNodes.value.length > 0) return;
+  if (!wfId || workflowNodes.value.length > 0 || isFetchingTopology.value) return;
+  isFetchingTopology.value = true;
+  topologyFetchFailed.value = false;
   try {
     // 后端返回原始 DTO（nodeKey/positionX/positionY/name），必须经 mapWorkflowDtoToWorkflow
     // 映射为画布形状（id/position{x,y}/data.label），否则渲染字段错位：
     // 节点全部叠在 (0,0)、连线消失、状态无法着色
     const wf = mapWorkflowDtoToWorkflow(await api.getWorkflow(wfId));
-    if (wf && Array.isArray(wf.nodes)) {
+    if (wf && Array.isArray(wf.nodes) && wf.nodes.length > 0) {
       workflowNodes.value = wf.nodes;
       workflowEdges.value = Array.isArray(wf.edges) ? wf.edges : [];
+    } else {
+      topologyFetchFailed.value = true;
     }
   } catch (err) {
+    topologyFetchFailed.value = true;
     console.warn('拉取工作流拓扑失败（拓扑图将不显示，其余功能不受影响）:', err);
+  } finally {
+    isFetchingTopology.value = false;
   }
 }
 
@@ -1777,6 +1811,10 @@ onMounted(async () => {
     }
     if ((currentRun.value.status || '').toUpperCase() !== 'RUNNING') {
       loadHistoryData();
+    }
+    // 提前并行拉取拓扑结构
+    if (localFound.workflowId) {
+      loadWorkflowTopology();
     }
   } else {
     isFetchingRun.value = true;
