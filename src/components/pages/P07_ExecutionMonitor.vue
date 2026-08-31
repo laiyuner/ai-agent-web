@@ -329,141 +329,134 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-            <!-- Input Card -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>输入</span>
-                  <span class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeInput) }} chars)</span>
-                </span>
+          <!-- 输入/输出分区标题行：左输入操作组 / 右输出操作组 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start text-xs font-mono">
+            <!-- Input 区标题 + 操作按钮 -->
+            <div class="flex items-center justify-between flex-wrap gap-1.5">
+              <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span>输入</span>
+                <span class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeInput) }} chars)</span>
+              </span>
 
-                <div class="flex items-center gap-1.5">
-                  <button
-                    @click="copyText(currentSelectedNodeInput, 'input')"
-                    class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                    :title="copiedState === 'input' ? '已复制' : '复制输入内容'"
-                  >
-                    <Check v-if="copiedState === 'input'" class="w-3.5 h-3.5 text-emerald-600" />
-                    <Copy v-else class="w-3.5 h-3.5" />
-                  </button>
+              <div class="flex items-center gap-1.5">
+                <button
+                  @click="copyText(currentSelectedNodeInput, 'input')"
+                  class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                  :title="copiedState === 'input' ? '已复制' : '复制输入内容'"
+                >
+                  <Check v-if="copiedState === 'input'" class="w-3.5 h-3.5 text-emerald-600" />
+                  <Copy v-else class="w-3.5 h-3.5" />
+                </button>
 
-                  <button
-                    @click="isInputExpanded = !isInputExpanded"
-                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                    :title="isInputExpanded ? '收起输入区域' : '展开输入区域'"
-                  >
-                    <ChevronUp v-if="isInputExpanded" class="w-3.5 h-3.5" />
-                    <ChevronDown v-else class="w-3.5 h-3.5" />
-                    <span>{{ isInputExpanded ? '收起' : '展开' }}</span>
-                  </button>
+                <button
+                  @click="isPanelExpanded = !isPanelExpanded"
+                  class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  :title="isPanelExpanded ? '收起输入/输出面板' : '展开输入/输出面板'"
+                >
+                  <ChevronUp v-if="isPanelExpanded" class="w-3.5 h-3.5" />
+                  <ChevronDown v-else class="w-3.5 h-3.5" />
+                  <span>{{ isPanelExpanded ? '收起' : '展开' }}</span>
+                </button>
 
-                  <button
-                    @click="openModal('输入内容 (' + selectedNodeKey + ')', currentSelectedNodeInput)"
-                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                    title="弹窗全屏查看全部"
-                  >
-                    <Maximize2 class="w-3.5 h-3.5" />
-                    <span>全屏</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Input Code Container (Fixed Flat Height with Internal Scrollbar) -->
-              <div
-                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden flex flex-col"
-                :class="isInputExpanded ? 'h-[60vh]' : 'min-h-30 max-h-64'"
-              >
-                <div class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text">
-                  <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeInput }}</pre>
-                </div>
+                <button
+                  @click="openModal('输入内容 (' + selectedNodeKey + ')', currentSelectedNodeInput)"
+                  class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  title="弹窗全屏查看全部"
+                >
+                  <Maximize2 class="w-3.5 h-3.5" />
+                  <span>全屏</span>
+                </button>
               </div>
             </div>
 
-            <!-- Output Card -->
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>输出</span>
-                  <span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="text-[11px] text-indigo-500 font-sans font-semibold animate-pulse">
-                    打字机生成中...
-                  </span>
-                  <span v-else class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeOutput) }} chars)</span>
+            <!-- Output 区标题 + 操作按钮 -->
+            <div class="flex items-center justify-between flex-wrap gap-1.5">
+              <span class="text-xs font-sans font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <span>输出</span>
+                <span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="text-[11px] text-indigo-500 font-sans font-semibold animate-pulse">
+                  打字机生成中...
                 </span>
+                <span v-else class="text-[10px] text-slate-400 font-normal font-mono">({{ getInputLength(currentSelectedNodeOutput) }} chars)</span>
+              </span>
 
-                <div class="flex items-center gap-1.5">
-                  <!-- 原文 / 渲染 切换 -->
-                  <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <button
-                      @click="isMarkdownView = false"
-                      class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
-                      :class="!isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
-                    >
-                      原文
-                    </button>
-                    <button
-                      @click="isMarkdownView = true"
-                      class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
-                      :class="isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
-                    >
-                      渲染
-                    </button>
-                  </div>
-
+              <div class="flex items-center gap-1.5">
+                <!-- 原文 / 渲染 切换 -->
+                <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                   <button
-                    @click="copyText(currentSelectedNodeOutput, 'output')"
-                    class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                    :title="copiedState === 'output' ? '已复制' : '复制输出数据'"
+                    @click="isMarkdownView = false"
+                    class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
+                    :class="!isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
                   >
-                    <Check v-if="copiedState === 'output'" class="w-3.5 h-3.5 text-emerald-600" />
-                    <Copy v-else class="w-3.5 h-3.5" />
+                    原文
                   </button>
-
                   <button
-                    @click="isOutputExpanded = !isOutputExpanded"
-                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                    :title="isOutputExpanded ? '收起输出区域' : '展开输出区域'"
+                    @click="isMarkdownView = true"
+                    class="px-2 py-0.5 text-[11px] font-sans font-bold rounded-md transition-colors cursor-pointer"
+                    :class="isMarkdownView ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400 hover:text-slate-600'"
                   >
-                    <ChevronUp v-if="isOutputExpanded" class="w-3.5 h-3.5" />
-                    <ChevronDown v-else class="w-3.5 h-3.5" />
-                    <span>{{ isOutputExpanded ? '收起' : '展开' }}</span>
-                  </button>
-
-                  <button
-                    @click="openModal('输出结果 (' + selectedNodeKey + ')', currentSelectedNodeOutput)"
-                    class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                    title="弹窗全屏查看全部"
-                  >
-                    <Maximize2 class="w-3.5 h-3.5" />
-                    <span>全屏</span>
+                    渲染
                   </button>
                 </div>
-              </div>
 
-              <!-- Output Code Container (Fixed Flat Height with Internal Scrollbar) -->
-              <div
-                class="relative bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden flex flex-col"
-                :class="isOutputExpanded ? 'h-[60vh]' : (getNodeStatus(selectedNodeKey) === 'RUNNING' ? 'h-64' : 'min-h-30 max-h-64')"
-              >
-                <div
-                  ref="outputContainer"
-                  class="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
-                  :class="isMarkdownView ? 'bg-slate-950' : ''"
+                <button
+                  @click="copyText(currentSelectedNodeOutput, 'output')"
+                  class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                  :title="copiedState === 'output' ? '已复制' : '复制输出数据'"
                 >
-                  <!-- 渲染视图：Markdown → HTML（DOMPurify 已消毒） -->
-                  <div
-                    v-if="isMarkdownView"
-                    class="md-body text-xs"
-                    v-html="renderedOutputHtml"
-                  ></div>
-                  <!-- 原文视图：打字机流式 -->
-                  <pre
-                    v-else
-                    v-memo="[currentSelectedNodeOutput, getNodeStatus(selectedNodeKey)]"
-                    class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text"
-                  >{{ displayNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
-                </div>
+                  <Check v-if="copiedState === 'output'" class="w-3.5 h-3.5 text-emerald-600" />
+                  <Copy v-else class="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  @click="isPanelExpanded = !isPanelExpanded"
+                  class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  :title="isPanelExpanded ? '收起输入/输出面板' : '展开输入/输出面板'"
+                >
+                  <ChevronUp v-if="isPanelExpanded" class="w-3.5 h-3.5" />
+                  <ChevronDown v-else class="w-3.5 h-3.5" />
+                  <span>{{ isPanelExpanded ? '收起' : '展开' }}</span>
+                </button>
+
+                <button
+                  @click="openModal('输出结果 (' + selectedNodeKey + ')', currentSelectedNodeOutput)"
+                  class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                  title="弹窗全屏查看全部"
+                >
+                  <Maximize2 class="w-3.5 h-3.5" />
+                  <span>全屏</span>
+                </button>
               </div>
+            </div>
+          </div>
+
+          <!-- 输入/输出共享代码面板：两分区等高拉伸（高度由较高侧驱动，封顶 max-h-64；
+               分隔线 md 以下横向 divide-y（上下布局），md 及以上纵向 divide-x（左右布局） -->
+          <div
+            class="bg-slate-950 rounded-2xl border border-slate-800 transition-all duration-200 overflow-hidden grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800"
+            :class="isPanelExpanded ? 'h-[60vh]' : (getNodeStatus(selectedNodeKey) === 'RUNNING' ? 'h-64' : 'min-h-30 max-h-64')"
+          >
+            <!-- 输入分区：内容顶部锚定，独立内部滚动 -->
+            <div class="overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text">
+              <pre class="text-slate-200 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text">{{ currentSelectedNodeInput }}</pre>
+            </div>
+
+            <!-- 输出分区：内容顶部锚定，独立内部滚动（ref 供自动滚动 watch 使用） -->
+            <div
+              ref="outputContainer"
+              class="overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-slate-950 select-text scroll-smooth"
+            >
+              <!-- 渲染视图：Markdown → HTML（DOMPurify 已消毒） -->
+              <div
+                v-if="isMarkdownView"
+                class="md-body text-xs"
+                v-html="renderedOutputHtml"
+              ></div>
+              <!-- 原文视图：打字机流式 -->
+              <pre
+                v-else
+                v-memo="[currentSelectedNodeOutput, getNodeStatus(selectedNodeKey)]"
+                class="text-emerald-300 text-xs leading-relaxed font-mono whitespace-pre-wrap select-text"
+              >{{ displayNodeOutput }}<span v-if="getNodeStatus(selectedNodeKey) === 'RUNNING'" class="inline-block w-2 h-3.5 bg-emerald-400 ml-0.5 animate-pulse align-middle"></span></pre>
             </div>
           </div>
         </div>
@@ -669,8 +662,8 @@ import { WebSocketEvent } from '../../types';
 const { state, setRoute, stopRun, updateRunInStore } = useAppStore();
 
 // UI States for Expansion & Modal
-const isInputExpanded = ref(false);
-const isOutputExpanded = ref(false);
+// 输入/输出面板共享展开状态（面板为整体，任一侧展开即整个面板升高）
+const isPanelExpanded = ref(false);
 const copiedState = ref<string | null>(null);
 
 // 输出 Markdown 渲染视图（默认原文，打字机流式期间观感更好且渲染开销低）
