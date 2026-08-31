@@ -239,14 +239,14 @@
                   <button
                     @click="copyText(currentSelectedNodeInput, 'input')"
                     class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                    :title="copiedState === 'input' ? '已复制' : '复制输入 JSON'"
+                    :title="copiedState === 'input' ? '已复制' : '复制输入内容'"
                   >
                     <Check v-if="copiedState === 'input'" class="w-3.5 h-3.5 text-emerald-600" />
                     <Copy v-else class="w-3.5 h-3.5" />
                   </button>
 
                   <button
-                    @click="openModal('输入 JSON (' + selectedNodeKey + ')', currentSelectedNodeInput)"
+                    @click="openModal('输入内容 (' + selectedNodeKey + ')', currentSelectedNodeInput)"
                     class="px-2 py-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[11px] font-sans font-semibold transition-colors flex items-center gap-1 cursor-pointer"
                     title="弹窗全屏查看全部"
                   >
@@ -654,12 +654,50 @@ const formattedStartTime = computed(() => {
     : currentRun.value.startTime.slice(-8);
 });
 
+/**
+ * 解包输入上下文：后端每个节点落库时把纯文本输入包装为 {"input": "纯文本"}（JSONB，
+ * 见 WorkflowExecutorService.buildInputContextMap）。若上游 Agent 的输出本身回显了
+ * 包装 JSON，下游落库会再包一层，形成多层嵌套，因此需要循环逐层解包。
+ *
+ * 解包条件（后端包装契约的精确形状）：对象恰好只有一个 input 键且值为 string。
+ * 命中则剥掉一层继续判断；业务 JSON（如 {"pr_url": "..."} 或含其他键）不解包。
+ * 深度上限 10 层，防御异常数据导致的理论死循环。
+ */
+function extractInputText(raw: unknown): string {
+  if (raw == null) return '';
+  let value: any = raw;
+  for (let depth = 0; depth < 10; depth++) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      if (!trimmed.startsWith('{')) return trimmed; // 纯文本
+      try {
+        value = JSON.parse(trimmed);
+      } catch {
+        return trimmed; // 以 { 开头但非合法 JSON，视为纯文本
+      }
+    }
+    // 对象形态：仅当"恰好只有一个 input 键且值为 string"（精确包装契约）时剥一层
+    if (value && typeof value === 'object' && !Array.isArray(value)
+        && Object.keys(value).length === 1
+        && typeof value.input === 'string') {
+      value = value.input; // 剥出的内层可能是纯文本，也可能是下一层包装，交由循环继续判断
+      continue;
+    }
+    // 非包装结构：对象/数组格式化展示
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
 const currentSelectedNodeInput = computed(() => {
-  if (!selectedNodeKey.value) return '{}';
-  if (nodeInputs[selectedNodeKey.value]) return nodeInputs[selectedNodeKey.value];
+  if (!selectedNodeKey.value) return '';
+  if (nodeInputs[selectedNodeKey.value]) return extractInputText(nodeInputs[selectedNodeKey.value]);
   const found = currentRun.value?.nodeStates?.find((n: any) => (n.nodeId || n.nodeKey) === selectedNodeKey.value);
-  if (found?.inputJson && found.inputJson !== '{}') return found.inputJson;
-  return currentRun.value?.input || found?.inputJson || '{}';
+  if (found?.inputJson && found.inputJson !== '{}') return extractInputText(found.inputJson);
+  if (currentRun.value?.input) return extractInputText(currentRun.value.input);
+  if (found?.inputJson) return extractInputText(found.inputJson);
+  return '';
 });
 
 const currentSelectedNodeOutput = computed(() => {
