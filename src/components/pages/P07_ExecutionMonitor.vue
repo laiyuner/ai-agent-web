@@ -657,7 +657,7 @@ import {
   X,
 } from 'lucide-vue-next';
 import { useAppStore } from '../../stores/useAppStore';
-import { api, tokenManager, mapRunDtoToRunRecord } from '../../api';
+import { api, tokenManager, mapRunDtoToRunRecord, mapWorkflowDtoToWorkflow } from '../../api';
 import { WebSocketEvent } from '../../types';
 
 const { state, setRoute, stopRun, updateRunInStore } = useAppStore();
@@ -694,7 +694,10 @@ async function loadWorkflowTopology() {
   const wfId = currentRun.value?.workflowId;
   if (!wfId || workflowNodes.value.length > 0) return;
   try {
-    const wf = await api.getWorkflow(wfId);
+    // 后端返回原始 DTO（nodeKey/positionX/positionY/name），必须经 mapWorkflowDtoToWorkflow
+    // 映射为画布形状（id/position{x,y}/data.label），否则渲染字段错位：
+    // 节点全部叠在 (0,0)、连线消失、状态无法着色
+    const wf = mapWorkflowDtoToWorkflow(await api.getWorkflow(wfId));
     if (wf && Array.isArray(wf.nodes)) {
       workflowNodes.value = wf.nodes;
       workflowEdges.value = Array.isArray(wf.edges) ? wf.edges : [];
@@ -1524,10 +1527,14 @@ function handleWebSocketEvent(data: WebSocketEvent) {
     }
 
     case 'RUN_FINISHED': {
-      const isSuccess = data.payload?.status === 'SUCCESS' || data.payload?.status === 'success';
-      currentRun.value.status = isSuccess ? 'SUCCESS' : 'FAILED';
-      if (data.payload?.duration) {
-        currentRun.value.durationMs = data.payload.duration;
+      // ① 状态映射：SUCCESS / FAILED / TERMINATED 三态（终止的 run 不再错标 FAILED）
+      const rawStatus = String(data.payload?.status || '').toUpperCase();
+      const finalStatus = rawStatus === 'TERMINATED' ? 'TERMINATED' : (rawStatus === 'SUCCESS' ? 'SUCCESS' : 'FAILED');
+      currentRun.value.status = finalStatus;
+      // ② 耗时：后端键名为 durationMs（历史遗留代码误读 duration，两键都兼容）
+      const finalDuration = Number(data.payload?.durationMs ?? data.payload?.duration) || 0;
+      if (finalDuration > 0) {
+        currentRun.value.durationMs = finalDuration;
       }
       runFinished.value = true;
       wsStatus.value = '已完成';
@@ -1540,8 +1547,8 @@ function handleWebSocketEvent(data: WebSocketEvent) {
       );
 
       addLog(
-        isSuccess ? 'info' : 'error',
-        `工作流${isSuccess ? '执行完成' : '执行失败'}，耗时: ${data.payload?.duration || currentRun.value.durationMs || 0}ms`,
+        finalStatus === 'SUCCESS' ? 'info' : (finalStatus === 'TERMINATED' ? 'warn' : 'error'),
+        `工作流${finalStatus === 'SUCCESS' ? '执行完成' : (finalStatus === 'TERMINATED' ? '执行被终止' : '执行失败')}，耗时: ${formatDuration(currentRun.value.durationMs || finalDuration)}`,
         data.timestamp
       );
       disconnect();
