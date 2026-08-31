@@ -423,13 +423,14 @@ export function mapLlmDtoToLlm(dto: any): LLMProvider {
     baseUrl: dto.baseUrl || '',
     // 密钥来源：DATABASE=数据库已配置；NONE=未配置（后端已移除 env 兜底）
     apiKeyConfigured: !!dto.hasApiKey,
+    keyless: Boolean(dto.keyless),
     keySource: dto.keySource || (dto.hasApiKey ? 'DATABASE' : 'NONE'),
     defaultModel: dto.defaultModel || 'glm-4-flash',
     supportedModels: Array.isArray(dto.supportedModels) && dto.supportedModels.length > 0
       ? dto.supportedModels
       : [dto.defaultModel || 'glm-4-flash'],
-    status: dto.hasApiKey ? 'configured' : 'unconfigured',
-    isBuiltIn: ['zhipu', 'deepseek', 'openai'].includes(pCode),
+    status: (dto.hasApiKey || dto.keyless) ? 'configured' : 'unconfigured',
+    isBuiltIn: ['zhipu', 'deepseek', 'openai', 'ollama'].includes(pCode),
   };
 }
 

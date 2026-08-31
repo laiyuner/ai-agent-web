@@ -98,6 +98,7 @@ export interface LLMProvider {
   code: string;
   baseUrl: string;
   apiKeyConfigured: boolean;
+  keyless?: boolean;
   keySource?: 'DATABASE' | 'NONE' | string;
   defaultModel: string;
   supportedModels: string[];

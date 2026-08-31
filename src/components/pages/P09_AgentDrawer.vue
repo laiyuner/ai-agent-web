@@ -209,17 +209,19 @@
                           <div class="min-w-0">
                             <div class="flex items-center gap-1.5 flex-wrap">
                               <span class="font-bold text-xs text-slate-900 truncate">
-                                {{ p.name }}{{ (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')) ? '（未配置密钥）' : '' }}
+                                {{ p.name }}{{ (!p.keyless && (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE'))) ? '（未配置密钥）' : '' }}
                               </span>
                               <span
                                 class="text-[9px] px-1 py-0.2 rounded font-mono"
                                 :class="
                                   (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE'))
                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/80'
+                                    : p.keyless
+                                    ? 'bg-sky-50 text-sky-600 border border-sky-200/80'
                                     : 'bg-slate-100 text-slate-500 border border-slate-200'
                                 "
                               >
-                                {{ (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) ? '已配置' : '未配置' }}
+                                {{ (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) ? '已配置' : (p.keyless ? '免密' : '未配置') }}
                               </span>
                             </div>
                             <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate">

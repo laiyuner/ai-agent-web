@@ -86,20 +86,34 @@
                 </div>
 
                 <div class="flex items-center gap-2 mt-1">
-                  <!-- 密钥来源徽章：DATABASE 绿色「数据库密钥」/ NONE 灰色「未配置密钥」 -->
+                  <!-- 密钥来源徽章：DATABASE 绿色「数据库密钥」/ keyless 蓝色「本地服务（无需密钥）」/ NONE 灰色「未配置密钥」 -->
                   <span
                     class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0"
                     :class="
                       p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                        : p.keyless
+                        ? 'bg-sky-50 text-sky-700 border border-sky-200/80'
                         : 'bg-slate-100 text-slate-600 border border-slate-200'
                     "
                   >
                     <span
                       class="w-1.5 h-1.5 rounded-full"
-                      :class="p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE') ? 'bg-emerald-500' : 'bg-slate-400'"
+                      :class="
+                        p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')
+                          ? 'bg-emerald-500'
+                          : p.keyless
+                          ? 'bg-sky-500'
+                          : 'bg-slate-400'
+                      "
                     ></span>
-                    {{ (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) ? '数据库密钥' : '未配置密钥' }}
+                    {{
+                      (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE'))
+                        ? '数据库密钥'
+                        : p.keyless
+                        ? '本地服务（无需密钥）'
+                        : '未配置密钥'
+                    }}
                   </span>
 
                   <span class="text-[11px] text-slate-400 font-mono font-medium truncate">
@@ -146,7 +160,7 @@
 
           <!-- 未配置密钥行内小字提示 -->
           <div
-            v-if="p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')"
+            v-if="!p.keyless && (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE'))"
             class="flex items-start gap-1.5 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[11px] leading-relaxed"
           >
             <AlertCircle class="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
@@ -250,7 +264,7 @@
           <div class="flex items-center justify-between">
             <label class="block text-xs font-bold text-slate-800">设置 / 切换 API Key</label>
             <span class="text-[11px] text-slate-400 font-mono">
-              {{ (p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '数据库密文存储中' : '暂无配置密钥' }}
+              {{ (p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '数据库密文存储中' : (p.keyless ? '免密钥服务（可按需配置）' : '暂无配置密钥') }}
             </span>
           </div>
 
@@ -260,7 +274,7 @@
               <input
                 v-model="keyInputs[p.id]"
                 :type="showKeys[p.id] ? 'text' : 'password'"
-                :placeholder="(p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '•••••••••••••••• (数据库密文存储中)' : 'sk-********************************'"
+                :placeholder="(p.keySource === 'DATABASE' || p.apiKeyConfigured) ? '•••••••••••••••• (数据库密文存储中)' : (p.keyless ? '可选：挂载鉴权网关时填 sk-***' : 'sk-********************************')"
                 class="w-full pl-8 pr-8 py-1.5 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/40 focus:bg-white transition-all"
               />
               <button
@@ -404,12 +418,13 @@
             </div>
           </div>
 
-          <!-- 4. API Key (apiKey) -->
-          <div class="space-y-1.5">
+          <!-- 4. API Key (apiKey) & 免密钥选项 -->
+          <div class="space-y-2">
             <div class="flex items-center justify-between">
               <label class="block text-xs font-bold text-slate-800">
                 API Key (apiKey)
-                <span v-if="modalMode === 'create'" class="text-rose-500">*</span>
+                <span v-if="modalMode === 'create' && !modalForm.keyless" class="text-rose-500">*</span>
+                <span v-else-if="modalForm.keyless" class="text-slate-400 font-normal text-[11px]">（选填，免密钥服务无需填写）</span>
                 <span v-else class="text-slate-400 font-normal text-[11px]">（选填，留空保持原密钥不变）</span>
               </label>
               <span class="text-[10px] text-slate-400">数据库高强度加密</span>
@@ -419,7 +434,7 @@
               <input
                 v-model="modalForm.apiKey"
                 :type="modalShowKey ? 'text' : 'password'"
-                :placeholder="modalMode === 'create' ? 'sk-... (Ollama 等本地免 Key 服务填占位符 ollama)' : '•••••••• (留空表示不修改已有密钥)'"
+                :placeholder="modalForm.keyless ? '可选：若本地服务挂载鉴权网关可填 sk-...' : (modalMode === 'create' ? 'sk-********************************' : '•••••••• (留空表示不修改已有密钥)')"
                 class="w-full pl-8 pr-8 py-2 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white transition-all"
               />
               <button
@@ -431,6 +446,19 @@
                 <EyeOff v-if="modalShowKey" class="w-3.5 h-3.5" />
                 <Eye v-else class="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            <!-- 免密钥本地服务 Checkbox -->
+            <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 mt-1">
+              <input
+                id="modal-keyless-checkbox"
+                v-model="modalForm.keyless"
+                type="checkbox"
+                class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500/20 border-slate-300 cursor-pointer"
+              />
+              <label for="modal-keyless-checkbox" class="text-xs font-semibold text-slate-800 cursor-pointer select-none flex-1">
+                免密钥本地服务（如 Ollama、vLLM，无需 API Key）
+              </label>
             </div>
           </div>
 
@@ -607,7 +635,7 @@ const activeFilter = ref<'all' | 'configured' | 'unconfigured'>('all');
 
 const filterTabs = [
   { id: 'all' as const, label: '全部供应商' },
-  { id: 'configured' as const, label: '数据库密钥 (已配置)' },
+  { id: 'configured' as const, label: '可用服务 (已配置/免密)' },
   { id: 'unconfigured' as const, label: '未配置密钥' },
 ];
 
@@ -629,6 +657,7 @@ const modalForm = reactive({
   displayName: '',
   baseUrl: '',
   apiKey: '',
+  keyless: false,
   modelsInput: '',
   defaultModel: '',
 });
@@ -638,12 +667,12 @@ const providerToDelete = ref<LLMProvider | null>(null);
 const isDeleting = ref(false);
 
 const urlPresets = [
-  { label: '阿里千问', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-max', models: 'qwen-max, qwen-plus, qwen-turbo' },
-  { label: '腾讯混元', url: 'https://api.hunyuan.cloud.tencent.com/v1', defaultModel: 'hunyuan-pro', models: 'hunyuan-pro, hunyuan-standard, hunyuan-lite' },
-  { label: 'Ollama 本地', url: 'http://localhost:11434/v1', defaultModel: 'llama3:latest', models: 'llama3:latest, qwen2.5:latest, mistral:latest' },
-  { label: 'DeepSeek', url: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-chat', models: 'deepseek-chat, deepseek-reasoner' },
-  { label: 'OpenAI', url: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', models: 'gpt-4o, gpt-4o-mini, o1-preview' },
-  { label: '智谱开放平台', url: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-4-flash', models: 'glm-4-flash, glm-4-plus, glm-4-air' },
+  { label: '阿里千问', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-max', models: 'qwen-max, qwen-plus, qwen-turbo', keyless: false },
+  { label: '腾讯混元', url: 'https://api.hunyuan.cloud.tencent.com/v1', defaultModel: 'hunyuan-pro', models: 'hunyuan-pro, hunyuan-standard, hunyuan-lite', keyless: false },
+  { label: 'Ollama 本地', url: 'http://localhost:11434/v1', defaultModel: 'llama3.1', models: 'llama3.1, qwen2.5:7b, deepseek-r1:8b', keyless: true },
+  { label: 'DeepSeek', url: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-chat', models: 'deepseek-chat, deepseek-reasoner', keyless: false },
+  { label: 'OpenAI', url: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', models: 'gpt-4o, gpt-4o-mini, o1-preview', keyless: false },
+  { label: '智谱开放平台', url: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-4-flash', models: 'glm-4-flash, glm-4-plus, glm-4-air', keyless: false },
 ];
 
 function applyUrlPreset(preset: typeof urlPresets[0]) {
@@ -653,6 +682,9 @@ function applyUrlPreset(preset: typeof urlPresets[0]) {
   }
   if (!modalForm.defaultModel) {
     modalForm.defaultModel = preset.defaultModel;
+  }
+  if (preset.keyless !== undefined) {
+    modalForm.keyless = preset.keyless;
   }
 }
 
@@ -671,14 +703,14 @@ const providerFormatError = computed(() => {
 
 function getCountByFilter(filterId: string) {
   if (filterId === 'all') return state.llmProviders.length;
-  if (filterId === 'configured') return state.llmProviders.filter((p) => p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')).length;
-  if (filterId === 'unconfigured') return state.llmProviders.filter((p) => p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')).length;
+  if (filterId === 'configured') return state.llmProviders.filter((p) => p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE') || p.keyless).length;
+  if (filterId === 'unconfigured') return state.llmProviders.filter((p) => (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE')) && !p.keyless).length;
   return 0;
 }
 
 const filteredProviders = computed(() => {
   return state.llmProviders.filter((p) => {
-    const isConfigured = p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE');
+    const isConfigured = p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE') || p.keyless;
     // Filter Tab
     if (activeFilter.value === 'configured' && !isConfigured) return false;
     if (activeFilter.value === 'unconfigured' && isConfigured) return false;
@@ -714,6 +746,9 @@ function getBrandStyle(code: string) {
   if (c.includes('hunyuan') || c.includes('tencent')) {
     return { bgClass: 'bg-cyan-50 border-cyan-200', textClass: 'text-cyan-600', icon: Cpu };
   }
+  if (c.includes('ollama') || c.includes('vllm')) {
+    return { bgClass: 'bg-slate-100 border-slate-300', textClass: 'text-slate-800', icon: Server };
+  }
   return { bgClass: 'bg-indigo-50 border-indigo-200', textClass: 'text-indigo-600', icon: Server };
 }
 
@@ -723,6 +758,7 @@ function openAddModal() {
   modalForm.displayName = '';
   modalForm.baseUrl = '';
   modalForm.apiKey = '';
+  modalForm.keyless = false;
   modalForm.modelsInput = '';
   modalForm.defaultModel = '';
   modalShowKey.value = false;
@@ -735,6 +771,7 @@ function openEditModal(p: LLMProvider) {
   modalForm.displayName = p.name || '';
   modalForm.baseUrl = p.baseUrl || '';
   modalForm.apiKey = ''; // 留空表示不更新原有密钥
+  modalForm.keyless = Boolean(p.keyless);
   modalForm.modelsInput = (p.supportedModels || []).join(', ');
   modalForm.defaultModel = p.defaultModel || (p.supportedModels && p.supportedModels[0]) || '';
   modalShowKey.value = false;
@@ -772,11 +809,11 @@ async function handleModalSubmit() {
 
   const defaultModel = modalForm.defaultModel.trim() || models[0];
 
-  if (modalMode.value === 'create' && !modalForm.apiKey.trim()) {
+  if (modalMode.value === 'create' && !modalForm.keyless && !modalForm.apiKey.trim()) {
     addToast({
       type: 'warning',
       title: '校验提示',
-      message: '新建供应商时 API Key 为必填项（Ollama 等本地免密服务可填 ollama）',
+      message: '新建供应商时 API Key 为必填项（若为免密钥本地服务请勾选免密钥）',
     });
     return;
   }
@@ -786,6 +823,7 @@ async function handleModalSubmit() {
     baseUrl: modalForm.baseUrl.trim(),
     supportedModels: models,
     defaultModel: defaultModel,
+    keyless: modalForm.keyless,
   };
 
   if (modalForm.apiKey.trim()) {
@@ -849,7 +887,7 @@ async function saveBaseUrl(p: LLMProvider) {
   }
 
   const updates: { baseUrl: string; apiKey?: string } = { baseUrl: newUrl };
-  const unconfigured = p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE');
+  const unconfigured = !p.keyless && (p.keySource === 'NONE' || (!p.apiKeyConfigured && p.keySource !== 'DATABASE'));
   if (unconfigured) {
     const keyVal = keyInputs[p.id]?.trim();
     if (!keyVal) {
@@ -868,12 +906,12 @@ async function saveBaseUrl(p: LLMProvider) {
 }
 
 function handleTestProvider(p: LLMProvider) {
-  const isConfigured = p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE');
-  if (!isConfigured) {
+  const canTest = (p.keySource === 'DATABASE' || (p.apiKeyConfigured && p.keySource !== 'NONE')) || p.keyless;
+  if (!canTest) {
     addToast({
       type: 'warning',
       title: '未配置密钥',
-      message: '请先配置 API Key 再测试连通性',
+      message: '请先配置密钥',
     });
     return;
   }

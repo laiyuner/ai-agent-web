@@ -1167,6 +1167,7 @@ export async function updateLlmProvider(
     defaultModel?: string;
     supportedModels?: string[];
     enabled?: boolean;
+    keyless?: boolean;
   }
 ) {
   if (!checkPermissionAndNotify('llm_provider:update')) return null;
@@ -1178,6 +1179,7 @@ export async function updateLlmProvider(
     if (updates.defaultModel !== undefined) reqData.defaultModel = updates.defaultModel;
     if (updates.supportedModels !== undefined) reqData.supportedModels = updates.supportedModels;
     if (updates.enabled !== undefined) reqData.enabled = updates.enabled;
+    if (updates.keyless !== undefined) reqData.keyless = updates.keyless;
 
     const dto = await api.updateLlmProvider(id, reqData);
     const updatedLlm = mapLlmDtoToLlm(dto);
